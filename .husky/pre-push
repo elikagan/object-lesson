@@ -1,0 +1,3 @@
+# Full test suite before any push to remote.
+# Refuses the push if anything fails.
+npm test

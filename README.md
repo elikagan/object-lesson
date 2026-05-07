@@ -1,36 +1,38 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Object Lesson
 
-## Getting Started
+E-commerce site for Eli Kagan & Megan Gage's vintage/art shop in Pasadena. Live at [objectlesson.la](https://objectlesson.la).
 
-First, run the development server:
+This is the **v2** stack — Next.js + Vercel + Supabase. The previous stack (GitHub Pages + Cloudflare Worker + JSON-file inventory) lived at [`elikagan/objectlesson-site`](https://github.com/elikagan/objectlesson-site) and is being migrated here.
+
+## Quickstart
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+cp .env.example .env.local   # then fill in values
+npm run dev                  # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Project docs
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+If you're a human or AI agent picking this up:
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- **[CLAUDE.md](./CLAUDE.md)** — rules for AI agents working on this codebase. Read first.
+- **[ARCHITECTURE.md](./ARCHITECTURE.md)** — what the stack is and why.
+- **[RUNBOOK.md](./RUNBOOK.md)** — deploy, rollback, common operations.
+- **[MIGRATION.md](./MIGRATION.md)** — active during the v1 → v2 migration. Archived after Phase 8.
 
-## Learn More
+## Tech stack
 
-To learn more about Next.js, take a look at the following resources:
+- **Framework:** Next.js 16 (App Router, TypeScript)
+- **Hosting:** Vercel
+- **Database:** Supabase Postgres
+- **Image storage:** Supabase Storage
+- **Styling:** Tailwind 4
+- **Testing:** Playwright (browser flows) + Vitest (unit, when needed)
+- **Payments:** Square
+- **Email:** Resend
+- **AI:** Google Gemini (image processing)
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Status
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Phase 1 of migration in progress. Production traffic still on the v1 stack.
