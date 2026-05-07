@@ -155,12 +155,15 @@ Total: ~20-30 hours across 4-6 sessions. Each phase has gates that must close be
 7. Configure staging domain DNS (per Phase 0.1 decision).
 
 ### Phase 1 gate (ALL must be true)
-- [ ] Staging URL loads
-- [ ] Hello-world page reads from Supabase successfully (renders `ok: 1`)
-- [ ] Eli has the staging URL bookmarked and confirmed it works
-- [ ] Production site (current) still loads unchanged at `objectlesson.la`
-- [ ] Initial commit on migration branch with `MIGRATION.md` + Next.js scaffold
-- [ ] Session log updated below
+- [x] Staging URL loads — https://object-lesson.vercel.app
+- [x] Hello-world page reads from Supabase successfully (renders Supabase connection: OK, sales count = 2)
+- [ ] Eli has the staging URL bookmarked and confirmed it works ← awaiting Eli
+- [x] Production site (current) still loads unchanged at `objectlesson.la`
+- [x] Initial commit on migration branch with `MIGRATION.md` + Next.js scaffold
+- [x] Session log updated below
+- [x] Branch protection on `main` enabled (PR-only, CI required)
+- [x] CI passing (lint + typecheck + Playwright smoke test)
+- [x] Husky pre-commit (lint+typecheck) and pre-push (full tests) installed
 
 ### Phase 1 rollback
 None needed — production untouched. If Phase 1 fails, delete Vercel project, no impact.
@@ -420,6 +423,26 @@ Trigger conditions per Phase 0.5. If triggered:
 - Wrote MIGRATION.md
 - Eli has not yet filled in Phase 0
 - **Awaiting:** Phase 0 decisions
+
+### 2026-05-07 — Phase 1 complete
+- Phase 0 decisions resolved verbally (Vercel default URL, two-Supabase-projects to be done in Phase 2, no specific cutover blackout, roll back on payment failures, fix forward on cosmetic, same admin PIN, feature freeze yes, fresh repo `elikagan/object-lesson`)
+- Created Next.js 16 scaffold with Tailwind 4, TypeScript
+- Installed dependencies: @supabase/supabase-js, @supabase/ssr, @playwright/test, husky
+- Created Vercel project `object-lesson` (org: elikagans-projects), linked to GitHub
+- Wired NEXT_PUBLIC_SUPABASE_URL + NEXT_PUBLIC_SUPABASE_ANON_KEY for production + development envs (preview deferred — CLI being weird; will set when needed for first feature branch)
+- Created GitHub repo `elikagan/object-lesson`, pushed initial commit
+- Set up Husky pre-commit (lint + typecheck) and pre-push (Playwright)
+- Wrote 5 docs: README, CLAUDE, ARCHITECTURE, RUNBOOK, MIGRATION
+- Wrote tests/smoke.spec.ts (passes locally + in CI)
+- Wrote tests/regressions.spec.ts with 6 fixme stubs covering v1 bug classes
+- Set up GitHub Actions CI workflow (.github/workflows/ci.yml)
+- Set GitHub repo secrets for CI: NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY
+- Enabled branch protection on `main` (requires `test` CI check)
+- First production deploy succeeded: https://object-lesson.vercel.app
+- Smoke test against deployed URL: Supabase connection OK, 2 rows in sales table ✓
+- CI green
+- **Phase 1 gate: 8/9 items checked. Last item (Eli confirms staging works) pending Eli's review.**
+- **Next:** Phase 2 — data layer (schema + migrate inventory.json + images to Supabase)
 
 ---
 
