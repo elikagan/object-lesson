@@ -73,9 +73,9 @@ const BATCH = 50;
 let total = 0;
 for (let i = 0; i < rows.length; i += BATCH) {
   const batch = rows.slice(i, i + BATCH);
-  const { error, count } = await supabase
+  const { error } = await supabase
     .from('items')
-    .upsert(batch, { onConflict: 'id', count: 'exact' });
+    .upsert(batch, { onConflict: 'id' });
   if (error) {
     console.error(`❌ Batch ${i}-${i + batch.length}:`, error.message);
     process.exit(1);

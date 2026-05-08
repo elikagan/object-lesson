@@ -8,7 +8,7 @@
  * Run: `node --env-file=.env.local scripts/migrate-images.mjs`
  */
 import { createClient } from '@supabase/supabase-js';
-import { readFile, readdir, stat } from 'node:fs/promises';
+import { readFile, readdir } from 'node:fs/promises';
 import { join, relative } from 'node:path';
 
 const V1_REPO = '/Users/elikagan/Desktop/Claude stuff/Object Lesson App and Website';
