@@ -217,3 +217,99 @@ test('"New" badge auto-expires after 7 days', async ({ page, request }) => {
     await request.delete(`http://localhost:3000/api/admin/items/${id}`, { headers: { Cookie: cookieHeader } });
   }
 });
+
+// ─────────────────────────────────────────────────────────────────
+// Photo upload UI — tests the actual click-and-drag flow, not just
+// the API route. Would have caught the bug Eli reported on 2026-05-08
+// where the "Add Photos" label had a redundant onClick that silently
+// cancelled the file picker.
+// ─────────────────────────────────────────────────────────────────
+
+// Tiny 1x1 transparent PNG, base64-decoded — sufficient for upload tests.
+// Real Playwright `setInputFiles` accepts a Buffer, so we don't need a fixture file.
+const TINY_PNG_BASE64 =
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
+
+test('clicking the Add Photos label opens the native file picker', async ({ page }) => {
+  // This is the regression test for the 2026-05-08 bug. The label had BOTH
+  // an onClick={() => ref.click()} AND wrapped the <input> as a child, so
+  // clicking it fired the picker twice. Chrome silently cancels the
+  // second open, so the user saw NOTHING when they clicked Add Photos.
+  //
+  // setInputFiles() bypasses the click entirely (it pokes the DOM input),
+  // so it can't catch this bug. We need to actually click the label and
+  // assert that the file picker fires exactly once.
+  await login(page);
+  await page.goto('/admin/items/new');
+
+  // Sanity: the label is visible and the hidden input exists.
+  await expect(page.locator('label.add-photo-btn')).toBeVisible();
+  await expect(page.locator('input[type="file"]#photo-input')).toHaveCount(1);
+
+  // Wait for the filechooser to fire when we click the label. If the click
+  // path is broken (double-trigger, missing htmlFor, etc.) this will time
+  // out and the test fails.
+  const fileChooserPromise = page.waitForEvent('filechooser', { timeout: 5_000 });
+  await page.locator('label.add-photo-btn').click();
+  const fileChooser = await fileChooserPromise;
+
+  // Setting files via the chooser uses the same code path as a real user
+  // selecting from the OS picker — it fires onChange on the bound input.
+  const buf = Buffer.from(TINY_PNG_BASE64, 'base64');
+  await fileChooser.setFiles({ name: 'test.png', mimeType: 'image/png', buffer: buf });
+
+  // A thumbnail preview should appear in the photo grid.
+  await expect(page.locator('.photo-grid .photo-cell img')).toHaveCount(1, { timeout: 5_000 });
+});
+
+test('image upload endpoint stores file and returns its path', async ({ page, request }) => {
+  // Direct test of POST /api/admin/items/[id]/images. Uses an `_test_*` id so
+  // the item is not picked up by the public smoke test (which filters to ids
+  // beginning with "/item/0"). This keeps image-upload coverage without
+  // racing parallel tests.
+  await login(page);
+  const cookies = await page.context().cookies();
+  const cookieHeader = cookies.map((c) => `${c.name}=${c.value}`).join('; ');
+  const id = `_test_imgup_${Date.now()}`;
+
+  try {
+    // Create the item shell first (no images yet)
+    const created = await request.post('http://localhost:3000/api/admin/items', {
+      headers: { 'Content-Type': 'application/json', Cookie: cookieHeader },
+      data: { id, title: `ImgUp Test ${Date.now()}`, category: 'misc', price: 1 },
+    });
+    expect(created.ok()).toBe(true);
+
+    // Upload a tiny PNG via the multipart form endpoint. Field name is "files"
+    // (plural) per the route handler.
+    const buf = Buffer.from(TINY_PNG_BASE64, 'base64');
+    const upload = await request.post(`http://localhost:3000/api/admin/items/${id}/images`, {
+      headers: { Cookie: cookieHeader },
+      multipart: {
+        files: { name: 'test.png', mimeType: 'image/png', buffer: buf },
+      },
+    });
+    expect(upload.ok()).toBe(true);
+    const { uploaded } = (await upload.json()) as { uploaded: string[] };
+    expect(uploaded.length).toBe(1);
+    expect(uploaded[0]).toMatch(/^images\/products\//);
+
+    // PATCH the item to attach the new path
+    await request.patch(`http://localhost:3000/api/admin/items/${id}`, {
+      headers: { 'Content-Type': 'application/json', Cookie: cookieHeader },
+      data: { images: uploaded, hero_image: uploaded[0] },
+    });
+
+    // Re-read and confirm
+    const got = await request.get(`http://localhost:3000/api/admin/items/${id}`, {
+      headers: { Cookie: cookieHeader },
+    });
+    const body = await got.json();
+    expect(body.item.images.length).toBe(1);
+    expect(body.item.hero_image).toMatch(/^images\/products\//);
+  } finally {
+    await request.delete(`http://localhost:3000/api/admin/items/${id}`, {
+      headers: { Cookie: cookieHeader },
+    });
+  }
+});

@@ -271,22 +271,31 @@ export function ItemEditor({
               );
             })}
           </div>
-          <label className="add-photo-btn" onClick={() => photoInputRef.current?.click()}>
+          {/*
+            v1 used <label> with the input as a child, no JS click handler — the
+            browser triggers the input natively when the label is clicked.
+            My v2 first attempt had BOTH a native label-trigger AND a programmatic
+            .click() — that double-trigger silently cancels the file picker on
+            some browsers (notably Chrome desktop when triggered by a synthetic
+            click on the label of a hidden input). Restore v1's pattern.
+          */}
+          <label className="add-photo-btn" htmlFor="photo-input">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
               <rect x="3" y="3" width="18" height="18" rx="2" />
               <circle cx="8.5" cy="8.5" r="1.5" />
               <polyline points="21 15 16 10 5 21" />
             </svg>
             <span>Add Photos</span>
-            <input
-              ref={photoInputRef}
-              type="file"
-              accept="image/*"
-              multiple
-              hidden
-              onChange={onAddPhotos}
-            />
           </label>
+          <input
+            ref={photoInputRef}
+            id="photo-input"
+            type="file"
+            accept="image/*"
+            multiple
+            hidden
+            onChange={onAddPhotos}
+          />
         </section>
 
         <section className="editor-section">
