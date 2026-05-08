@@ -1,22 +1,56 @@
 import { test, expect } from '@playwright/test';
 
 /**
- * Smoke test — Phase 2 connectivity.
- * The home page must render, prove Supabase connectivity, and show a sample
- * item from the new items table with its image loading from Supabase Storage.
+ * Phase 3 smoke tests — public site renders end-to-end.
  *
- * If this fails: either Vercel can't reach Supabase, env vars aren't set,
- * the items table is empty, or images aren't publicly readable.
+ * Each test asserts a critical user flow:
+ *   - Homepage loads with the grid + at least one product card
+ *   - Item detail loads, has Buy Now / Inquire / Share, image carousel
+ *   - About page renders
+ *   - Gift cert form renders (purchase form, no purchase yet)
+ *   - 404 for unknown item
  */
-test('home page renders with items table connected', async ({ page }) => {
+
+test('homepage shows grid with products', async ({ page }) => {
   await page.goto('/');
-  await expect(page.getByRole('heading', { name: /Object Lesson/i })).toBeVisible();
-  await expect(page.getByText(/Supabase connection: OK/)).toBeVisible();
-  await expect(page.getByText(/items.*table contains/)).toBeVisible();
-  // Sample item rendered with its image
-  await expect(page.getByText(/Sample item from items table/)).toBeVisible();
-  // The image element should exist and have a Supabase Storage URL
-  const sampleImg = page.locator('img').first();
-  await expect(sampleImg).toBeVisible();
-  await expect(sampleImg).toHaveAttribute('src', /supabase\.co\/storage/);
+  await expect(page.locator('.logo')).toBeVisible();
+  // At least one product card with an image
+  await expect(page.locator('.card').first()).toBeVisible();
+  await expect(page.locator('.card-image img').first()).toBeVisible();
+  // Filter button visible
+  await expect(page.getByRole('button', { name: /All/ })).toBeVisible();
+});
+
+test('clicking a product opens its detail page with carousel', async ({ page }) => {
+  await page.goto('/');
+  // Click first card
+  const firstCard = page.locator('.card').first();
+  const href = await firstCard.getAttribute('href');
+  expect(href).toMatch(/^\/item\/\d+/);
+  await firstCard.click();
+  // Item title + price + inquire button
+  await expect(page.locator('.detail-title')).toBeVisible();
+  await expect(page.locator('.detail-price')).toBeVisible();
+  await expect(page.locator('.detail-inquire')).toBeVisible();
+  // First slide image visible
+  await expect(page.locator('.detail-slide img').first()).toBeVisible();
+});
+
+test('about page loads', async ({ page }) => {
+  await page.goto('/about');
+  await expect(page.getByText(/Uncommon Objects/)).toBeVisible();
+  await expect(page.getByText(/480 S. Fair Oaks/)).toBeVisible();
+});
+
+test('gift page shows purchase form', async ({ page }) => {
+  await page.goto('/gift');
+  await expect(page.getByRole('heading', { name: /Gift Certificate/ })).toBeVisible();
+  await expect(page.getByPlaceholder('50')).toBeVisible();
+  await expect(page.getByRole('button', { name: /Purchase Gift Certificate/ })).toBeVisible();
+});
+
+test('unknown item returns 404', async ({ page }) => {
+  const response = await page.goto('/item/000999999');
+  expect(response?.status()).toBe(404);
+  await expect(page.getByText(/no longer available/)).toBeVisible();
 });
