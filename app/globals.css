@@ -1,5 +1,4 @@
-/* Tailwind is available for admin/internal pages later. */
+/* Tailwind only — actual page styles live in:
+   - app/site.css (imported by app/(public)/layout.tsx for the public site)
+   - app/admin/style.css (imported by app/admin/layout.tsx for the admin) */
 @import "tailwindcss";
-
-/* Public site styles — ported from v1. */
-@import "./site.css";
