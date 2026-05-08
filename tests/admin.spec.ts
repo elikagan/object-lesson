@@ -28,9 +28,11 @@ test('locked admin requires PIN', async ({ page }) => {
 
 test('correct PIN unlocks and shows items list', async ({ page }) => {
   await login(page);
-  await expect(page.getByText(/Inventory \(\d+\)/)).toBeVisible();
-  // At least one item should be there from migration
-  await expect(page.locator('a[href^="/admin/items/"]').first()).toBeVisible();
+  // v1 admin: topbar with logo + at least one .item-row in the DOM
+  await expect(page.locator('.topbar-logo')).toBeVisible();
+  // Wait until the list has rendered
+  await page.waitForSelector('.item-row', { timeout: 10000 });
+  expect(await page.locator('.item-row').count()).toBeGreaterThan(0);
 });
 
 // ─────────────────────────────────────────────────────────────────

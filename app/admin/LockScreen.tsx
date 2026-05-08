@@ -2,13 +2,16 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import styles from './admin.module.css';
 
+/**
+ * Lock screen — matches v1 admin/index.html lines 18-27 verbatim.
+ * Wired to v2's auth API but visually identical to the original.
+ */
 export function LockScreen() {
   const router = useRouter();
   const [pin, setPin] = useState('');
-  const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -28,41 +31,35 @@ export function LockScreen() {
       }
       router.replace('/admin/items');
       router.refresh();
-    } catch {
-      setError('Network error');
     } finally {
       setSubmitting(false);
     }
   }
 
   return (
-    <div className={styles.lockShell}>
-      <div className={styles.lockBox}>
+    <div id="view-lock" className="view">
+      <form className="setup" onSubmit={onSubmit} autoComplete="on">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/OL_logo.svg" alt="Object Lesson" style={{ width: 120, marginBottom: 24 }} />
-        <h1>Admin</h1>
-        <form onSubmit={onSubmit}>
-          <input
-            type="password"
-            inputMode="text"
-            autoFocus
-            className={styles.pinInput}
-            placeholder="• • • •"
-            value={pin}
-            onChange={(e) => setPin(e.target.value)}
-            disabled={submitting}
-          />
-          <button
-            type="submit"
-            className={`${styles.btn} ${styles.btnPrimary}`}
-            style={{ width: '100%' }}
-            disabled={submitting || !pin}
-          >
-            {submitting ? 'Checking...' : 'Unlock'}
-          </button>
-        </form>
-        {error && <p style={{ color: '#c63131', marginTop: 12, fontSize: 13 }}>{error}</p>}
-      </div>
+        <img src="/OL_logo.svg" alt="Object Lesson" className="setup-logo" />
+        <input type="hidden" name="username" value="admin" autoComplete="username" />
+        <label className="field-label">PIN</label>
+        <input
+          type="password"
+          id="input-pin"
+          className="field"
+          name="password"
+          placeholder="Enter PIN"
+          autoComplete="current-password"
+          autoFocus
+          value={pin}
+          onChange={(e) => setPin(e.target.value)}
+          disabled={submitting}
+        />
+        <button type="submit" className="btn-primary" disabled={submitting}>
+          {submitting ? 'Checking...' : 'Unlock'}
+        </button>
+        {error && <p style={{ color: '#c63131', marginTop: 12, fontSize: 13, textAlign: 'center' }}>{error}</p>}
+      </form>
     </div>
   );
 }
