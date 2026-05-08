@@ -7,9 +7,7 @@ import { createClient } from '@/lib/supabase/client';
 
 const PHONE = '3104985138';
 const EMAIL = 'eli@objectlesson.la';
-// During Phase 3, the new site still calls the v1 worker for checkout.
-// In Phase 5 this gets replaced with /api/checkout (a Next.js route).
-const CHECKOUT_URL = 'https://ol-checkout.objectlesson.workers.dev/checkout';
+const CHECKOUT_URL = '/api/checkout';
 
 type Discount = { code: string; type: 'percent' | 'fixed'; value: number } | null;
 

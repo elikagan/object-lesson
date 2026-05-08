@@ -5,9 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import { useState } from 'react';
 import styles from './gift.module.css';
 
-// During Phase 3, the gift checkout still calls the v1 worker.
-// In Phase 5 this gets replaced with /api/gift-checkout.
-const CHECKOUT_URL = 'https://ol-checkout.objectlesson.workers.dev/gift-checkout';
+const CHECKOUT_URL = '/api/gift-checkout';
 
 export function GiftClient() {
   const params = useSearchParams();
