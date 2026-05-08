@@ -23,16 +23,14 @@ test('homepage shows grid with products', async ({ page }) => {
 
 test('clicking a product opens its detail page with carousel', async ({ page }) => {
   await page.goto('/');
-  // Click first card
-  const firstCard = page.locator('.card').first();
-  const href = await firstCard.getAttribute('href');
-  expect(href).toMatch(/^\/item\/\d+/);
-  await firstCard.click();
-  // Item title + price + inquire button
+  // Find a card linking to a real numeric-id item (admin tests may inject test items
+  // with `_test_*` ids; skip those).
+  const cards = page.locator('.card[href^="/item/0"]');
+  await cards.first().waitFor({ state: 'visible' });
+  await cards.first().click();
   await expect(page.locator('.detail-title')).toBeVisible();
   await expect(page.locator('.detail-price')).toBeVisible();
   await expect(page.locator('.detail-inquire')).toBeVisible();
-  // First slide image visible
   await expect(page.locator('.detail-slide img').first()).toBeVisible();
 });
 
