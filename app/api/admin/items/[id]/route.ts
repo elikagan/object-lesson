@@ -7,6 +7,7 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/admin/guard';
 import { createServiceClient } from '@/lib/supabase/server';
+import { notifyIndexNow, itemUrl } from '@/lib/indexnow';
 
 const UPDATABLE_FIELDS = new Set([
   'title',
@@ -73,6 +74,10 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     .maybeSingle();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   if (!data) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+
+  // Tell search engines this URL changed. Best-effort, fire-and-forget.
+  void notifyIndexNow(itemUrl(id));
+
   return NextResponse.json({ item: data });
 }
 
@@ -109,6 +114,10 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
       console.warn(`[delete ${id}] storage cleanup failed:`, storageErr.message);
     }
   }
+
+  // Tell search engines the URL is gone (they'll 404 it on re-crawl, but a
+  // ping speeds that up).
+  void notifyIndexNow(itemUrl(id));
 
   return NextResponse.json({ ok: true, deletedFiles: allPaths.length });
 }

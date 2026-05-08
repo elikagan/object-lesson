@@ -7,6 +7,7 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/admin/guard';
 import { createServiceClient } from '@/lib/supabase/server';
+import { notifyIndexNow, itemUrl } from '@/lib/indexnow';
 
 export async function GET() {
   const denied = await requireAdmin();
@@ -69,5 +70,9 @@ export async function POST(request: Request) {
 
   const { data, error } = await supabase.from('items').insert(insert).select().single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  // Tell search engines a new URL exists. Best-effort, fire-and-forget.
+  void notifyIndexNow(itemUrl(insert.id));
+
   return NextResponse.json({ item: data });
 }
