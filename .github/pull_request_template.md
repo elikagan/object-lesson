@@ -10,14 +10,23 @@
 
 ## Audit row (if applicable)
 
-<!-- e.g. "AUDIT.md row 2.4 — drag-to-reorder photos in editor" -->
+<!--
+  e.g. "P0-2 — Admin Sales view"
+  If this PR closes one or more audit rows, list their IDs (P0-N / P1-N / P2-N)
+  here or in the title. The audit-row-sync workflow will require this PR's
+  diff to flip those rows from `- [ ]` to `- [x]` in AUDIT.md. No silent
+  claims of completion.
+-->
 
 ## Evidence
 
 <!--
-  Required: a screenshot, a screen recording, OR a Vercel preview URL with
-  reproduction steps. "It compiles" / "tests pass" are NOT evidence —
-  CI catches those automatically. This section proves you used the feature.
+  Required: a screenshot or a screen recording showing the change working.
+  The `evidence` workflow blocks merge if this section has no embedded image,
+  GitHub user-attachment URL, or Loom/YouTube link.
+
+  A bare Vercel preview URL is NOT evidence — it doesn't prove anyone
+  clicked through. The picture / video does.
 -->
 
 ## Checklist
@@ -25,5 +34,5 @@
 - [ ] I exercised this change in a real browser (local dev or Vercel preview). Evidence is in the section above.
 - [ ] No new `coming soon`, `placeholder`, or `TODO ... later/port/follow-up` strings in shipped code (the `check-no-stubs` step enforces this; this checkbox confirms intent).
 - [ ] If this is a bug fix: a regression test exists in this PR, and CI on the parent commit was confirmed to fail without the fix.
-- [ ] If this PR touches `MIGRATION.md` checkbox state: evidence for each newly-checked box is linked above.
+- [ ] If this PR closes an `AUDIT.md` row: this PR also flips that row's `- [ ]` to `- [x]` (the `audit-row-sync` workflow enforces this).
 - [ ] No v1 feature is removed or regressed by this PR (cross-check `AUDIT.md`).

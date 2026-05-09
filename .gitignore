@@ -46,3 +46,6 @@ next-env.d.ts
 /playwright/.cache
 /test-results
 /migration-backup
+
+# claude code local overrides (per-developer, not committed)
+.claude/settings.local.json

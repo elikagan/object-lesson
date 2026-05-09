@@ -1,11 +1,19 @@
 name: PR checklist enforcer
 
-# Refuses to mark a PR mergeable until every checkbox in the PR description
-# is ticked. The template lives at .github/pull_request_template.md.
+# Three checks, all blocking, all run on every PR event:
 #
-# This is the safety net for "shipped without exercising in browser." If
-# you don't have a screenshot, you don't have evidence; if you don't have
-# evidence, you don't merge.
+#   1. PR template was used and every checkbox is ticked
+#      (anti-pattern: opening a PR without the template, or with unchecked boxes).
+#
+#   2. PR body contains real evidence — a screenshot, a screen recording,
+#      or a hosted video link. "It compiles / tests pass" is NOT evidence.
+#
+#   3. AUDIT row sync — if the PR title or body references an audit row ID
+#      (e.g. "P0-2"), the diff in this PR MUST flip that row from `- [ ]`
+#      to `- [x]` in AUDIT.md. No silent claims of completion.
+#
+# Together these prevent the "shipped without exercising it / declared done
+# without proof" failure mode that produced this audit list in the first place.
 
 on:
   pull_request:
@@ -40,3 +48,111 @@ jobs:
             }
 
             core.info(`All ${all.length} checklist items checked.`);
+
+  evidence:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const body = context.payload.pull_request.body || '';
+
+            // Real evidence patterns:
+            //   - Markdown image:        ![alt](https://...)
+            //   - HTML <img>:            <img ... src="...">
+            //   - GitHub user attachment URL (drag-and-drop upload)
+            //   - Hosted video link:     loom.com, youtube.com/watch, youtu.be
+            //
+            // A bare Vercel preview URL is NOT evidence — it doesn't prove
+            // anyone actually clicked through. The picture / video does.
+            const patterns = [
+              /!\[[^\]]*\]\([^)]+\)/,
+              /<img\s[^>]*src=/i,
+              /https?:\/\/github\.com\/user-attachments\//i,
+              /https?:\/\/(?:www\.)?loom\.com\//i,
+              /https?:\/\/(?:www\.)?(?:youtube\.com\/watch|youtu\.be\/)/i,
+            ];
+
+            const matched = patterns.some((rx) => rx.test(body));
+
+            if (!matched) {
+              core.setFailed(
+                'PR body has no embedded evidence. Required: a screenshot ' +
+                '(drag-and-drop into the PR body), a Loom/YouTube link, or ' +
+                'a markdown image. A bare Vercel preview URL is not evidence — ' +
+                'you must show the change working.'
+              );
+              return;
+            }
+
+            core.info('Evidence found in PR body.');
+
+  audit-row-sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const { execSync } = require('child_process');
+
+            const title = context.payload.pull_request.title || '';
+            const body = context.payload.pull_request.body || '';
+            const baseSha = context.payload.pull_request.base.sha;
+            const headSha = context.payload.pull_request.head.sha;
+
+            // Find audit row IDs referenced in the title or body: P0-1, P1-13, P2-39, etc.
+            const idRe = /\bP[012]-\d+\b/g;
+            const titleIds = title.match(idRe) || [];
+            const bodyIds = body.match(idRe) || [];
+            const referenced = [...new Set([...titleIds, ...bodyIds])];
+
+            if (referenced.length === 0) {
+              core.info('No audit row IDs referenced — skipping sync check.');
+              return;
+            }
+
+            try {
+              execSync(`git fetch origin ${baseSha} --depth=1`, { stdio: 'pipe' });
+            } catch {}
+            let diff = '';
+            try {
+              diff = execSync(
+                `git diff ${baseSha}..${headSha} -- AUDIT.md`,
+                { encoding: 'utf8' }
+              );
+            } catch (e) {
+              core.setFailed(`Could not diff AUDIT.md: ${e.message}`);
+              return;
+            }
+
+            // For each referenced ID, the diff must contain a line that flips
+            //   - [ ] **P0-2 ...   →   - [x] **P0-2 ...
+            // Look for both sides of the hunk:
+            //   +- [x] **P0-2        (added)
+            //   -- [ ] **P0-2        (removed)
+            const missing = [];
+            for (const id of referenced) {
+              const addedRe = new RegExp(`^\\+- \\[[xX]\\] \\*\\*${id}\\b`, 'm');
+              const removedRe = new RegExp(`^-- \\[ \\] \\*\\*${id}\\b`, 'm');
+              if (!addedRe.test(diff) || !removedRe.test(diff)) {
+                missing.push(id);
+              }
+            }
+
+            if (missing.length > 0) {
+              core.setFailed(
+                `PR references audit row(s) ${missing.join(', ')} but the AUDIT.md ` +
+                `diff does not flip them from "- [ ]" to "- [x]". Either flip the ` +
+                `box in this PR, or remove the audit ID from the title/body if this ` +
+                `PR doesn't actually close it.`
+              );
+              return;
+            }
+
+            core.info(
+              `AUDIT.md correctly flips ${referenced.join(', ')} from "[ ]" to "[x]".`
+            );
