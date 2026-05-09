@@ -345,64 +345,84 @@ The data source (`/api/admin/sales`) exists in v2. Just no UI on top of it.
 
 ---
 
-## 4 · Punch list grouped by severity
+## 4 · Punch list (the work queue)
+
+**Each row is a single PR.** Pick the top unchecked P0 row. When the PR
+that resolves it is merged, mark the box `[x]` in the same PR.
+
+A row is **resolved** when EITHER:
+- The feature works in v2 with browser evidence (screenshot/recording in the merged PR), OR
+- We've explicitly decided it's out of scope (note that decision under the row).
+
+A row is **NOT resolved** by:
+- Code that compiles. Tests passing. "Looks right." A previous AI claiming it was done.
+
+Order of work: P0 → P1 → P2. Within a tier, top to bottom. Don't skip.
 
 ### P0 — blocks revenue or admin operations
 
-1. **Hamburger menu Analytics/Sales/GiftCerts/Marketing all broken** (link to dead v1 URL)
-2. **Admin Sales view — not built**
-3. **Admin Analytics dashboard — not built**
-4. **Admin Gift Certificates view — not built** (no way to view/create/void without going to v1)
-5. **End-to-end checkout untested** ($1 test on hold)
-6. **Webhook end-to-end untested** (mark-sold, gift email, sale record)
-7. **Discount code apply at checkout — untested**
-8. **Filter dropdown — verify all 9 categories incl Under $400 + click-outside close**
-9. **Touch carousel on detail page — verify drag mechanics**
-10. **Drag-to-reorder items in admin list — verify**
-11. **Email gate before Buy Now — verify flow**
-12. **Square webhook signature validation — verify hardened**
+- [ ] **P0-1 · Hamburger menu sub-views are dead links.** All four (Analytics / Sales / Gift Certificates / Marketing) point at `https://objectlesson.la/admin/#analytics` etc. — after Phase 7 cutover that URL is v2 itself, so the fragment goes nowhere. See §2.2. Fix: either build the four sub-views (P0-2/3/4 plus Marketing P1-17), or replace the menu with the items we actually have. Decide first; don't ship dead links.
+- [ ] **P0-2 · Admin Sales view — not built.** §2.10. v1 had a transaction list with All-Time / Month / Today revenue cards and per-row customer/posted-by/code/discount. Data source already exists at `/api/admin/sales`. Just need the UI.
+- [ ] **P0-3 · Admin Analytics dashboard — not built.** §2.9. v1 had range toggle (1d/7d/30d/90d), sparkline, conversion funnel, top items, categories, traffic sources, devices, revenue. **Note:** dashboard is empty until P1-13 (analytics writes) is fixed.
+- [ ] **P0-4 · Admin Gift Certificates view — not built.** §2.12. Create + list + void. Without this you cannot view, create, or void gift certs without going back to v1. Depends on P1-19 (`/send-gift-email` endpoint) for the auto-email flow.
+- [ ] **P0-5 · End-to-end checkout untested.** Run the $1 test purchase: Buy Now → Square → return to site with `?purchased=1` → thank-you card shows. Verify item is marked sold, sale row written, buyer email captured. Hold per Eli pending mechanical safeguards in place — now in place.
+- [ ] **P0-6 · Webhook end-to-end untested.** §3.2. With the $1 test (P0-5) verify: signature validates, item flipped sold, buyer email landed in `emails`, sale row written with cardholder name + posted_by + payment id. Same test exercises gift-cert email path if the test purchase is a gift cert.
+- [ ] **P0-7 · Discount code apply at checkout — untested.** §3.3. Enter `WELCOME10` (or any active code) on a detail page → strikethrough + green discounted price → Buy Now → Square shows discounted total → on success `used_count` increments by 1.
+- [ ] **P0-8 · Filter dropdown parity.** §1.2. Verify all 9 options (`all`, `under-400`, plus 7 categories), `under-400` filters to non-sold items where `0 < price < 400`, click-outside closes, sold-items-pushed-to-end on `all`.
+- [ ] **P0-9 · Touch carousel on detail page.** §1.3. Verify on a real phone: finger-following drag, vertical-vs-horizontal direction lock, 0.3x edge resistance at boundaries, 20% width threshold to advance, smooth snap-back. Single-image items hide thumb strip.
+- [ ] **P0-10 · Drag-to-reorder items in admin list.** §2.3. Verify: drag handle works, reorder persists across reload (writes to `items.display_order` or equivalent), archive (sold) section is excluded from reorder.
+- [ ] **P0-11 · Email gate before Buy Now.** §1.3. Verify: first-time buyer (no `ol_email_collected` in localStorage) clicks Buy Now → email gate appears → submit → row written to `emails` with `source='abandoned_cart'`, `item_id` set → checkout proceeds. Subsequent buys skip the gate.
+- [ ] **P0-12 · Square webhook signature validation — hardened.** §3.2. Verify: signature mismatch returns non-2xx (v1 logged a warning and continued — fix that here). Test with a deliberately bad signature.
 
 ### P1 — data loss / known-bad UX
 
-13. **No analytics writes** — `events` table going dark; lose page_view, item_view, inquire, buy_now, email_signup, gift_purchase, session_end, etc.
-14. **Per-photo AI exempt toggle — not built**
-15. **Per-photo reprocess menu (lighting/background/shadow) — not built**
-16. **Drag-to-reorder photos in editor — not built**
-17. **Admin Marketing view (emails + discount codes) — not built**
-18. **Privacy page (`/privacy`) — not ported**
-19. **`/send-gift-email` worker endpoint — not ported** (needed when admin GC create is built)
-20. **PIN rate limiting — verify v2 has equivalent**
-21. **Reconcile sales on admin load — verify**
-22. **Inquire link format on mobile — verify SMS body matches v1**
-23. **Post-purchase thank-you with SMS link — verify**
-24. **Image CDN proxy (`/img/*`) — verify v2 has long-TTL cached image serving**
-25. **Site banner ("adding more…") — verify renders + dismiss persists**
-26. **Most-viewed item panel in editor topbar (if any in v1)**
-27. **Card sold-pushed-to-end ordering on All — verify**
+- [ ] **P1-13 · No analytics writes anywhere in v2.** §1.6. v1 wrote 8+ event types (`page_view`, `item_view`, `inquire`, `buy_now`, `filter`, `email_signup`, `discount_applied`, `session_end`, `gift_purchase`) to Supabase `events`. v2 writes none. Port the `trackEvent()` helper + bot-UA filter + session-id + UTM capture, then sprinkle the calls. The events table is currently going dark.
+- [ ] **P1-14 · Per-photo AI exempt toggle — not built.** §2.5. v1 had a star button on each unprocessed photo to skip background-removal (e.g. tape-measure photos). The `aiProcess` field is in the v2 type but no UI toggles it.
+- [ ] **P1-15 · Per-photo reprocess menu — not built.** §2.5. v1 had three options per processed photo: Better lighting / Better background / Better shadow. Each maps to a Gemini prompt in `lib/admin/gemini.ts` (port from v1 `admin/app.js:962-1022`).
+- [ ] **P1-16 · Drag-to-reorder photos in editor — not built.** §2.5. v1 used Sortable.js with 150ms touch delay. Reorder must update both the `images` array order and which photo is `hero_image` (first one).
+- [ ] **P1-17 · Admin Marketing view — not built.** §2.11. Email subscribers table + count + CSV export, plus discount codes list with create/toggle-active. Filters out gift certs (those live in P0-4).
+- [ ] **P1-18 · Privacy page (`/privacy`) — not ported.** §1.8. Static page; v1 source is `privacy/index.html` (96 lines). Required disclosure for Meta Pixel / GDPR.
+- [ ] **P1-19 · `/send-gift-email` endpoint — not ported.** §3.1. Needed by P0-4 (admin Gift Cert create with optional auto-send). Mirrors v1 worker `handleSendGiftEmail` — Resend API call with the gift-cert HTML template.
+- [ ] **P1-20 · PIN rate limiting.** §2.1. v1: 5 attempts → 5-minute lockout. Verify v2 enforces this (or build it).
+- [ ] **P1-21 · Reconcile sales on admin load.** §2.3. v1 admin called `/sales` on load and auto-marked any item sold whose Square sale row exists but `is_sold` is still false. Catches webhook misses. Verify or port.
+- [ ] **P1-22 · Inquire link format on mobile.** §1.3. Mobile: `sms:3104985138&body=...`; desktop: `mailto:eli@objectlesson.la?subject=Inquiry: {title}&body=...`. Verify both formats and the body text.
+- [ ] **P1-23 · Post-purchase thank-you with SMS link.** §1.3. Returning from `?purchased=1#{id}` shows thank-you card with pickup info and an SMS link prefilled with the purchased item's title.
+- [ ] **P1-24 · Image CDN with long TTL.** §3.1. v1 served images via `/img/*` with `Cache-Control: public, max-age=31536000, immutable` at the Cloudflare edge. Verify v2 (Supabase Storage) gets equivalent caching, or proxy.
+- [ ] **P1-25 · Site banner ("We're adding more of our collection every day").** §1.1. Dismissable, persists dismissal in localStorage. Verify it renders and dismiss sticks across reloads.
+- [ ] **P1-26 · Card sold-pushed-to-end ordering on `all`.** §1.2. v1: in `all` view, sold items show at end at 45% opacity. Other categories exclude sold entirely. Verify the sort order matches.
+- [ ] **P1-27 · `New` badge auto-expires after 7 days.** §1.2. Already in `lib/items.ts` per audit, but verify it works on a real fresh item and on a stale one.
 
-### P2 — polish
+### P2 — polish (don't touch until P0/P1 empty)
 
-28. PWA service worker + manifest (admin)
-29. CSP header on public pages
-30. Mosaic pause on tab hidden / detail open
-31. Card animation stagger
-32. Loading dot / scroll hint
-33. Custom confirm dialog (vs `window.confirm`)
-34. Spinner overlay on photo reprocess
-35. Hero white-dot indicator on first photo
-36. Posted-by badge color (purple) in list
-37. Browser autofill on PIN
-38. Google sitemap ping
-39. `/sales-backfill`, `/sales-backfill-names`, `/removebg` worker endpoints
+- [ ] **P2-28 · PWA service worker + manifest** for admin (offline shell, Add to Home Screen).
+- [ ] **P2-29 · CSP header** on public pages (currently relying on Next.js defaults).
+- [ ] **P2-30 · Mosaic pause** when tab hidden or on detail view.
+- [ ] **P2-31 · Card fade-up animation** with 0.04s stagger.
+- [ ] **P2-32 · Detail-page scroll hint** (bouncing chevron, dismisses after 50px scroll).
+- [ ] **P2-33 · Custom confirm dialog** (replace any `window.confirm` calls in admin).
+- [ ] **P2-34 · Photo reprocess spinner overlay** (depends on P1-15).
+- [ ] **P2-35 · Hero white-dot indicator** on first photo in editor.
+- [ ] **P2-36 · Posted-by badge** purple styling in admin list.
+- [ ] **P2-37 · Browser autofill** on PIN screen (hidden username field).
+- [ ] **P2-38 · Google sitemap ping** on item save.
+- [ ] **P2-39 · v1 worker endpoints** that are nice-to-have but not blocking: `/sales-backfill`, `/sales-backfill-names`, `/removebg`.
 
 ---
 
-## 5 · How I'd work this list
+## 5 · How to work a row
 
-1. **Don't touch P2 until P0/P1 is empty.**
-2. **For each row above marked ⚠️, the *first* step is to verify against the live v2 site** — read-only, browser, network tab, screenshot. Then either flip to ✅ or write a P-level fix ticket.
-3. **One PR per row.** No bundling. You verify the preview before merge. You verify production after merge. Then I open the next.
-4. **Critical path first**: webhook + checkout + discount + email-gate (P0 revenue path), then the four hamburger items (P0 admin), then analytics writes (P1), then everything else.
+For every row, the workflow is:
+
+1. **Read the section it links back to** (e.g. P0-2 references §2.10) for the v1 reference and the expected behavior.
+2. **If status is "verify"** (not "not built"): drive the live v2 site in a browser. Network tab open. Either:
+   - It works → mark `[x]` with a screenshot in the PR description that resolves the row.
+   - It's broken → leave unchecked, open a PR that fixes it.
+3. **If status is "not built"**: port from v1, exercise it in browser, screenshot, ship.
+4. **One row per PR.** Use the PR template. Required evidence checkbox enforced by `pr-checklist` workflow.
+5. **The PR that resolves a row is the same PR that flips its `[ ]` to `[x]` in this file.**
+6. After merge, the post-deploy smoke runs against the live site. If it fails, fix forward immediately or roll back; the row stays unchecked until the production version actually works.
+
+**Critical path first within P0:** revenue path (P0-5/6/7/11/12) before admin views (P0-1/2/3/4) before UX verification (P0-8/9/10).
 
 ---
 
