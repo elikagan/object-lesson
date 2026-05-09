@@ -4,6 +4,16 @@ import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { Item, Category, Condition } from '@/lib/types';
 import { thumbUrl } from '@/lib/items';
+import {
+  fileToDataUrl,
+  dataUrlToFile,
+  geminiOCR,
+  geminiDetectTag,
+  geminiDetectTapeMeasure,
+  geminiRemoveBackground,
+  geminiSuggest,
+  toTitleCase,
+} from '@/lib/admin/gemini';
 
 /**
  * Editor — matches v1 admin/index.html lines 87-185 verbatim.
@@ -34,7 +44,19 @@ const CONDITIONS: Condition[] = ['New', 'Like New', 'Good', 'Fair'];
 
 type Mode = 'create' | 'edit';
 
-type Photo = { remotePath: string } | { pendingFile: File; preview: string };
+/**
+ * Photo state in the editor:
+ *   - remotePath: already in Supabase Storage (an existing item being edited).
+ *   - pendingFile: chosen via the file picker but not yet uploaded.
+ *
+ * Pending photos can be AI-processed (background removal, etc.) before save.
+ * `processed` means the AI has already run on this photo (don't re-run).
+ * `aiProcess` means "include in AI processing" — set false to skip a photo
+ * (e.g. tape measure photos should not have their backgrounds removed).
+ */
+type Photo =
+  | { remotePath: string }
+  | { pendingFile: File; preview: string; processed?: boolean; aiProcess?: boolean };
 
 export function ItemEditor({
   mode,
@@ -80,9 +102,178 @@ export function ItemEditor({
     if (files.length === 0) return;
     setPhotos((p) => [
       ...p,
-      ...files.map((file) => ({ pendingFile: file, preview: URL.createObjectURL(file) }) as Photo),
+      ...files.map(
+        (file) =>
+          ({
+            pendingFile: file,
+            preview: URL.createObjectURL(file),
+            processed: false,
+            aiProcess: true,
+          }) as Photo,
+      ),
     ]);
     e.target.value = '';
+  }
+
+  // ─── AI Processing ──────────────────────────────────────────────────
+  // Runs the same 4-step pipeline as v1:
+  //   1. Detect price tag photo → OCR → fill price/dealer/title; remove tag photo
+  //   2. Detect tape measure photo → fill size; mark tape photo as ai-exempt
+  //   3. Background-remove remaining product photos (3 retries each)
+  //   4. AI-suggest title/desc/category/maker/condition for empty fields
+  //
+  // Only operates on pending (unsaved, un-uploaded) photos. Existing remote
+  // photos are left alone — re-processing on edit isn't supported.
+  const [aiBusy, setAiBusy] = useState(false);
+
+  async function processWithAI() {
+    if (aiBusy) return;
+    const pendingIndices = photos
+      .map((p, i) => ('pendingFile' in p ? i : -1))
+      .filter((i) => i >= 0);
+    if (pendingIndices.length === 0) {
+      setStatus('Add photos first.');
+      return;
+    }
+    setAiBusy(true);
+    setStatus('Reading photos…');
+
+    try {
+      // Snapshot the pending photos as data URLs once — Gemini calls below
+      // operate on these copies, then we patch state at the end.
+      let working = await Promise.all(
+        photos.map(async (p) => {
+          if ('pendingFile' in p) {
+            return {
+              kind: 'pending' as const,
+              file: p.pendingFile,
+              preview: p.preview,
+              dataUrl: await fileToDataUrl(p.pendingFile),
+              processed: p.processed ?? false,
+              aiProcess: p.aiProcess ?? true,
+            };
+          }
+          return { kind: 'remote' as const, remotePath: p.remotePath };
+        }),
+      );
+
+      // ── Step 1: price tag detection + OCR ─────────────────────
+      const unprocessedFor1 = working
+        .map((w, i) => (w.kind === 'pending' && !w.processed ? i : -1))
+        .filter((i) => i >= 0);
+
+      if (unprocessedFor1.length > 0) {
+        setStatus('Scanning for price tag…');
+        const dataUrls = unprocessedFor1.map((i) => {
+          const w = working[i];
+          if (w.kind !== 'pending') throw new Error('unreachable');
+          return w.dataUrl;
+        });
+        const tagIndexInSubset = await geminiDetectTag(dataUrls);
+        if (tagIndexInSubset >= 0 && tagIndexInSubset < unprocessedFor1.length) {
+          const tagPhotoIdx = unprocessedFor1[tagIndexInSubset];
+          const tagPhoto = working[tagPhotoIdx];
+          if (tagPhoto.kind === 'pending') {
+            setStatus('Reading price tag…');
+            const ocr = await geminiOCR(tagPhoto.dataUrl);
+            if (ocr.price && !price) setPrice(String(ocr.price));
+            if (ocr.dealerCode && !dealerCode) setDealerCode(ocr.dealerCode);
+            if (ocr.itemName && !title) setTitle(toTitleCase(ocr.itemName));
+            // Remove the tag photo
+            URL.revokeObjectURL(tagPhoto.preview);
+            working = working.filter((_, i) => i !== tagPhotoIdx);
+          }
+        }
+      }
+
+      // ── Step 2: tape measure → dimensions ─────────────────────
+      const unprocessedFor2 = working
+        .map((w, i) => (w.kind === 'pending' && !w.processed ? i : -1))
+        .filter((i) => i >= 0);
+
+      if (unprocessedFor2.length > 0 && !size) {
+        setStatus('Checking for tape measure…');
+        const dataUrls = unprocessedFor2.map((i) => {
+          const w = working[i];
+          if (w.kind !== 'pending') throw new Error('unreachable');
+          return w.dataUrl;
+        });
+        const tape = await geminiDetectTapeMeasure(dataUrls);
+        if (tape.size) setSize(tape.size);
+        if (tape.tapeIndex >= 0 && tape.tapeIndex < unprocessedFor2.length) {
+          const tapePhotoIdx = unprocessedFor2[tape.tapeIndex];
+          const tapePhoto = working[tapePhotoIdx];
+          if (tapePhoto.kind === 'pending') {
+            tapePhoto.aiProcess = false;
+          }
+        }
+      }
+
+      // ── Step 3: background removal ────────────────────────────
+      const toCleanIdx = working
+        .map((w, i) => (w.kind === 'pending' && !w.processed && w.aiProcess ? i : -1))
+        .filter((i) => i >= 0);
+
+      let failed = 0;
+      for (let n = 0; n < toCleanIdx.length; n++) {
+        const idx = toCleanIdx[n];
+        const w = working[idx];
+        if (w.kind !== 'pending') continue;
+        setStatus(`Processing image ${n + 1} of ${toCleanIdx.length}…`);
+        const cleaned = await geminiRemoveBackground(w.dataUrl);
+        if (cleaned) {
+          // Replace the File + dataUrl + preview with the processed image
+          URL.revokeObjectURL(w.preview);
+          const newFile = dataUrlToFile(cleaned, w.file.name.replace(/\.\w+$/, '.jpg'));
+          const newPreview = URL.createObjectURL(newFile);
+          w.file = newFile;
+          w.dataUrl = cleaned;
+          w.preview = newPreview;
+          w.processed = true;
+        } else {
+          failed++;
+        }
+      }
+
+      // ── Step 4: text suggestions ──────────────────────────────
+      const remainingDataUrls = working
+        .filter((w): w is Extract<typeof w, { kind: 'pending' }> => w.kind === 'pending')
+        .map((w) => w.dataUrl);
+      if (remainingDataUrls.length > 0) {
+        setStatus('Analyzing item…');
+        const sugg = await geminiSuggest(remainingDataUrls);
+        if (sugg.title && !title) setTitle(sugg.title);
+        if (sugg.description && !description) setDescription(sugg.description);
+        if (sugg.maker && !maker) setMaker(sugg.maker);
+        if (sugg.condition && !condition) setCondition(sugg.condition);
+        if (sugg.category && !category) {
+          const allowed = ['wall-art', 'object', 'ceramic', 'furniture', 'light', 'sculpture', 'misc'];
+          if (allowed.includes(sugg.category)) setCategory(sugg.category);
+        }
+      }
+
+      // Patch React state with the new pending photos
+      setPhotos(
+        working.map((w) =>
+          w.kind === 'remote'
+            ? ({ remotePath: w.remotePath } as Photo)
+            : ({
+                pendingFile: w.file,
+                preview: w.preview,
+                processed: w.processed,
+                aiProcess: w.aiProcess,
+              } as Photo),
+        ),
+      );
+
+      setStatus(failed > 0 ? `Done — ${failed} image(s) failed processing.` : 'Done.');
+      setTimeout(() => setStatus(''), 3000);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setStatus(`Error: ${msg}`);
+    } finally {
+      setAiBusy(false);
+    }
   }
 
   function removePhoto(idx: number) {
@@ -302,9 +493,10 @@ export function ItemEditor({
           <button
             type="button"
             className="btn-secondary"
-            onClick={() => alert('AI processing — coming in next update.')}
+            onClick={processWithAI}
+            disabled={aiBusy}
           >
-            Process with AI
+            {aiBusy ? 'Processing…' : 'Process with AI'}
           </button>
           <div className="processing-status" />
         </section>
