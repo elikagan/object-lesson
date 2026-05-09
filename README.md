@@ -73,7 +73,9 @@ These are not optional. Each one breaks the build / blocks the merge if violated
 |---|---|---|
 | **No-stub regex** | `scripts/check-no-stubs.mjs` — pre-commit hook + CI | `alert("...coming soon")`, `// TODO ... later`, etc. in shipped code |
 | **Post-deploy production smoke** | `tests/production-smoke.spec.ts` + `.github/workflows/post-deploy.yml` | Anything broken on the live site within minutes of deploy. Auto-opens issue. |
-| **PR checklist enforcer** | `.github/pull_request_template.md` + `.github/workflows/pr-checklist.yml` | PRs that lack browser evidence — every box must be checked before merge. |
+| **PR checklist enforcer** | `.github/pull_request_template.md` + `.github/workflows/pr-checklist.yml` `checklist` job | PRs that lack browser evidence — every box must be checked before merge. |
+| **PR evidence regex** | `.github/workflows/pr-checklist.yml` `evidence` job | PRs whose body has no embedded screenshot, video link, or attached image. A bare preview URL is not evidence. |
+| **AUDIT row sync** | `.github/workflows/pr-checklist.yml` `audit-row-sync` job | A PR that references audit row `P0-N` (or P1-N / P2-N) in its title or body but doesn't flip that row's `[ ]` to `[x]` in `AUDIT.md`. Stops silent claims of completion. |
 
 Plus the existing layer:
 
@@ -84,11 +86,13 @@ Plus the existing layer:
 ## The work loop
 
 1. Read `CLAUDE.md`, `AUDIT.md`, this README.
-2. Pick the **top unchecked P0 row** in `AUDIT.md`.
-3. Open a PR for that single row. Use the PR template. Provide a screenshot or recording showing the change working in a real browser.
-4. CI runs lint + typecheck + check-stubs + Playwright. PR checklist enforcer requires every box ticked.
-5. After merge, Vercel auto-deploys. Post-deploy smoke runs against the live site.
-6. Pick the next row.
+2. Pick the **top unchecked `[ ]` row** in `AUDIT.md` section 4.
+3. Branch off `main`. Open a PR. Title and/or body must reference the row ID (e.g. `P0-2`).
+4. The same PR flips `- [ ] **P0-2 ...` to `- [x] **P0-2 ...` in `AUDIT.md`. The audit-row-sync workflow blocks merge if you don't.
+5. PR body must include a screenshot or recording. The evidence workflow blocks merge if it doesn't.
+6. Every checkbox in the PR template must be ticked. The checklist workflow blocks merge otherwise.
+7. CI runs lint + typecheck + check-stubs + Playwright. After merge, Vercel deploys, post-deploy smoke runs against the live site.
+8. Pick the next row.
 
 **One row per PR. Never declare anything "done" without browser evidence.**
 
