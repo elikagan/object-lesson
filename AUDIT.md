@@ -254,15 +254,13 @@ v1 has `trackEvent()` calls for these. **v2 has zero analytics writes** — conf
 
 ### 2.10 Sales view (admin)
 
-**Status: ❌ NOT BUILT in v2.**
+**Status: ✅ Built in v2 (PR #14).** Server-rendered at `/admin/sales`, wired into the hamburger menu.
 
-| Feature | v1 ref | Severity |
-|---|---|---|
-| Summary stats: All Time / Month / Today revenue | `admin/app.js:2305-2320` | P0 |
-| Total transactions, items vs gift cert split | `admin/app.js:2321-2323` | P0 |
-| Transaction list (type, title, customer, date, posted-by, code, discount) | `admin/app.js:2325-2369` | P0 |
-
-The data source (`/api/admin/sales`) exists in v2. Just no UI on top of it.
+| Feature | v1 ref | Severity | v2 |
+|---|---|---|---|
+| Summary stats: All Time / Month / Today revenue | `admin/app.js:2305-2320` | P0 | ✅ `AdminSalesView.tsx` |
+| Total transactions, items vs gift cert split | `admin/app.js:2321-2323` | P0 | ✅ |
+| Transaction list (type, title, customer, date, posted-by, code, discount) | `admin/app.js:2325-2369` | P0 | ✅ |
 
 ### 2.11 Marketing view (admin)
 
@@ -362,7 +360,7 @@ Order of work: P0 → P1 → P2. Within a tier, top to bottom. Don't skip.
 ### P0 — blocks revenue or admin operations
 
 - [ ] **P0-1 · Hamburger menu sub-views are dead links.** All four (Analytics / Sales / Gift Certificates / Marketing) point at `https://objectlesson.la/admin/#analytics` etc. — after Phase 7 cutover that URL is v2 itself, so the fragment goes nowhere. See §2.2. Fix: either build the four sub-views (P0-2/3/4 plus Marketing P1-17), or replace the menu with the items we actually have. Decide first; don't ship dead links.
-- [ ] **P0-2 · Admin Sales view — not built.** §2.10. v1 had a transaction list with All-Time / Month / Today revenue cards and per-row customer/posted-by/code/discount. Data source already exists at `/api/admin/sales`. Just need the UI.
+- [x] **P0-2 · Admin Sales view — not built.** §2.10. v1 had a transaction list with All-Time / Month / Today revenue cards and per-row customer/posted-by/code/discount. Data source already exists at `/api/admin/sales`. Just need the UI.
 - [ ] **P0-3 · Admin Analytics dashboard — not built.** §2.9. v1 had range toggle (1d/7d/30d/90d), sparkline, conversion funnel, top items, categories, traffic sources, devices, revenue. **Note:** dashboard is empty until P1-13 (analytics writes) is fixed.
 - [ ] **P0-4 · Admin Gift Certificates view — not built.** §2.12. Create + list + void. Without this you cannot view, create, or void gift certs without going back to v1. Depends on P1-19 (`/send-gift-email` endpoint) for the auto-email flow.
 - [ ] **P0-5 · End-to-end checkout untested.** Run the $1 test purchase: Buy Now → Square → return to site with `?purchased=1` → thank-you card shows. Verify item is marked sold, sale row written, buyer email captured. Hold per Eli pending mechanical safeguards in place — now in place.
