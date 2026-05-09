@@ -57,20 +57,25 @@ jobs:
           script: |
             const body = context.payload.pull_request.body || '';
 
-            // Real evidence patterns:
-            //   - Markdown image:        ![alt](https://...)
-            //   - HTML <img>:            <img ... src="...">
-            //   - GitHub user attachment URL (drag-and-drop upload)
-            //   - Hosted video link:     loom.com, youtube.com/watch, youtu.be
+            // Real evidence patterns. Each one is tightened to reject the
+            // common ways someone can fake "I attached something."
             //
-            // A bare Vercel preview URL is NOT evidence — it doesn't prove
-            // anyone actually clicked through. The picture / video does.
+            //   - Markdown image must have an http(s) URL with a file
+            //     extension (png/jpg/jpeg/gif/webp/svg/mp4/mov/webm). A
+            //     plain string in the parens (e.g. "placeholder") fails.
+            //   - <img> must have an http(s) src.
+            //   - GitHub user-attachment URLs only count if they have the
+            //     `/assets/{hash}` path. Real drag-and-drop uploads always
+            //     do; hand-rolled placeholders typically don't.
+            //   - Loom / YouTube URLs must include a watch ID, not just
+            //     the bare domain.
             const patterns = [
-              /!\[[^\]]*\]\([^)]+\)/,
-              /<img\s[^>]*src=/i,
-              /https?:\/\/github\.com\/user-attachments\//i,
-              /https?:\/\/(?:www\.)?loom\.com\//i,
-              /https?:\/\/(?:www\.)?(?:youtube\.com\/watch|youtu\.be\/)/i,
+              /!\[[^\]]*\]\(https?:\/\/[^)\s]+\.(?:png|jpe?g|gif|webp|svg|mp4|mov|webm)(?:\?[^)\s]*)?\)/i,
+              /<img\s[^>]*src=["']https?:\/\//i,
+              /https?:\/\/github\.com\/user-attachments\/assets\/[A-Za-z0-9][A-Za-z0-9-]{6,}/i,
+              /https?:\/\/(?:www\.)?loom\.com\/share\/[A-Za-z0-9]{8,}/i,
+              /https?:\/\/(?:www\.)?youtube\.com\/watch\?v=[A-Za-z0-9_-]{6,}/i,
+              /https?:\/\/(?:www\.)?youtu\.be\/[A-Za-z0-9_-]{6,}/i,
             ];
 
             const matched = patterns.some((rx) => rx.test(body));
