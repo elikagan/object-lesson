@@ -55,3 +55,27 @@ export const FILTER_OPTIONS: { value: string; label: string }[] = [
   { value: 'sculpture', label: 'Sculpture' },
   { value: 'misc', label: 'Misc' },
 ];
+
+/**
+ * Sale — row in `public.sales`. Written by the Square webhook; read by the
+ * admin sales view. Shape derived from the migration-backup JSON snapshot
+ * under `migration-backup/cutover-{date}/sales.json`.
+ */
+export type SaleType = 'item' | 'gift_certificate';
+
+export type Sale = {
+  id: string;
+  type: SaleType;
+  amount: number;
+  customer_email: string | null;
+  customer_name: string | null;
+  item_id: string | null;
+  item_title: string | null;
+  gift_code: string | null;
+  discount_code: string | null;
+  discount_amount: number | null;
+  square_payment_id: string | null;
+  note: string | null;
+  posted_by: string | null;
+  created_at: string;
+};

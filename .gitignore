@@ -49,3 +49,4 @@ next-env.d.ts
 
 # claude code local overrides (per-developer, not committed)
 .claude/settings.local.json
+.claude/launch.json

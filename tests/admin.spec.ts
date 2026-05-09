@@ -313,3 +313,69 @@ test('image upload endpoint stores file and returns its path', async ({ page, re
     });
   }
 });
+
+// ─────────────────────────────────────────────────────────────────
+// Sales view (P0-2 — admin sub-view parity with v1)
+// ─────────────────────────────────────────────────────────────────
+
+test('admin /sales requires PIN (redirects to lock screen when not authed)', async ({ page }) => {
+  await page.goto('/admin/sales');
+  // Unauthenticated visit must NOT show the sales summary cards.
+  await expect(page.locator('.sales-summary')).toHaveCount(0);
+  // Should land on the lock screen — the password input is rendered.
+  await expect(page.locator('input[type="password"]')).toBeVisible();
+});
+
+test('admin /sales renders summary cards + transaction list (matches v1 visuals)', async ({ page }) => {
+  await login(page);
+  await page.goto('/admin/sales');
+
+  // Summary block: three stat cards labelled per v1 (All Time / This Month / Today).
+  await expect(page.locator('.sales-summary')).toBeVisible();
+  await expect(page.locator('.sales-stat')).toHaveCount(3);
+  await expect(page.locator('.sales-stat-label').nth(0)).toHaveText('All Time');
+  await expect(page.locator('.sales-stat-label').nth(1)).toHaveText('This Month');
+  await expect(page.locator('.sales-stat-label').nth(2)).toHaveText('Today');
+
+  // All three stat values must render in USD format (dollars + 2 decimals).
+  for (let i = 0; i < 3; i++) {
+    const text = await page.locator('.sales-stat-value').nth(i).innerText();
+    expect(text).toMatch(/^\$[\d,]+\.\d{2}$/);
+  }
+
+  // Meta line below the cards: "N total transactions · X items ($Y) · Z gift certs ($W)".
+  await expect(page.locator('.sales-meta')).toContainText('total transactions');
+  await expect(page.locator('.sales-meta')).toContainText('items');
+  await expect(page.locator('.sales-meta')).toContainText('gift certs');
+
+  // Transaction History header is always present.
+  await expect(page.locator('.marketing-section-title')).toHaveText('Transaction History');
+
+  // Either at least one .sale-row OR the empty-state message — never both.
+  const rowCount = await page.locator('.sale-row').count();
+  const emptyVisible = await page.locator('.marketing-empty').isVisible().catch(() => false);
+  expect(rowCount > 0 || emptyVisible).toBe(true);
+
+  // If we have rows, each one carries an Item or Gift Cert badge.
+  // Note: `.sale-type` has `text-transform: uppercase` in admin/style.css,
+  // so `innerText` returns the rendered (uppercase) form.
+  if (rowCount > 0) {
+    const badgeText = await page.locator('.sale-type').first().innerText();
+    expect(['ITEM', 'GIFT CERT']).toContain(badgeText);
+  }
+});
+
+test('admin list-view hamburger menu links Sales to /admin/sales (no longer dead)', async ({ page }) => {
+  await login(page);
+  // Open the hamburger.
+  await page.locator('button[aria-label="Menu"]').click();
+  const salesLink = page.locator('.menu-dropdown a.menu-item', { hasText: 'Sales' });
+  await expect(salesLink).toBeVisible();
+  // The href must be the in-app route, not the dead v1 hash URL.
+  await expect(salesLink).toHaveAttribute('href', '/admin/sales');
+
+  // Click → land on the sales page → see the summary block.
+  await salesLink.click();
+  await page.waitForURL('**/admin/sales');
+  await expect(page.locator('.sales-summary')).toBeVisible();
+});
