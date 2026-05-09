@@ -2,7 +2,18 @@
 
 This file is the **contract** for AI agents working on this codebase. It is short on purpose. Read it. Follow it.
 
-> Also read `AGENTS.md` for Next.js 16 specific notices.
+---
+
+## Session start (do this every time)
+
+1. Read this file (`CLAUDE.md`).
+2. Read `AUDIT.md` — the v1 → v2 parity gap list. **The work queue.**
+3. Read `README.md` — project layout + how the safeguards work.
+4. Pick the **top unchecked P0 row** in `AUDIT.md`.
+5. Open a PR for that single row. Use the PR template. Provide browser evidence (screenshot or recording) in the PR description.
+6. Do NOT work on multiple rows in one PR. Do NOT mark anything done without a screenshot or recording.
+
+If you can't find the row, can't reproduce, or hit ambiguity: **stop and ask Eli.** Do not guess.
 
 ---
 

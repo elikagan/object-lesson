@@ -8,7 +8,9 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
+    "check-stubs": "node scripts/check-no-stubs.mjs",
     "test": "playwright test",
+    "test:prod-smoke": "PLAYWRIGHT_BASE_URL=https://objectlesson.la playwright test tests/production-smoke.spec.ts",
     "test:ui": "playwright test --ui",
     "prepare": "husky"
   },
