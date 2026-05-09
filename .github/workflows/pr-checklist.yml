@@ -1,0 +1,42 @@
+name: PR checklist enforcer
+
+# Refuses to mark a PR mergeable until every checkbox in the PR description
+# is ticked. The template lives at .github/pull_request_template.md.
+#
+# This is the safety net for "shipped without exercising in browser." If
+# you don't have a screenshot, you don't have evidence; if you don't have
+# evidence, you don't merge.
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened, ready_for_review]
+
+jobs:
+  checklist:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const body = context.payload.pull_request.body || '';
+
+            const all = body.match(/^- \[[ xX]\] /gm) || [];
+            const unchecked = body.match(/^- \[ \] /gm) || [];
+
+            if (all.length === 0) {
+              core.setFailed(
+                'PR description must use the template (.github/pull_request_template.md). ' +
+                'No checklist items were found.'
+              );
+              return;
+            }
+
+            if (unchecked.length > 0) {
+              core.setFailed(
+                `${unchecked.length} required checkbox(es) still unchecked in the PR description. ` +
+                'Either check them (with evidence) or remove the item if it does not apply.'
+              );
+              return;
+            }
+
+            core.info(`All ${all.length} checklist items checked.`);

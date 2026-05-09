@@ -1,4 +1,5 @@
-# Fast checks on every commit — lint + typecheck.
+# Fast checks on every commit — lint + typecheck + stub-pattern check.
 # Slow tests (Playwright) run on pre-push.
 npm run lint
 npm run typecheck
+npm run check-stubs
