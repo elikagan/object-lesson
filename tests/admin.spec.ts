@@ -379,3 +379,97 @@ test('admin list-view hamburger menu links Sales to /admin/sales (no longer dead
   await page.waitForURL('**/admin/sales');
   await expect(page.locator('.sales-summary')).toBeVisible();
 });
+
+// ─────────────────────────────────────────────────────────────────
+// Gift Certificates view (P0-4 — admin sub-view parity with v1)
+// ─────────────────────────────────────────────────────────────────
+
+test('admin /giftcerts requires PIN (redirects to lock screen when not authed)', async ({ page }) => {
+  await page.goto('/admin/giftcerts');
+  // Unauthenticated visit must NOT show the create form or list.
+  await expect(page.locator('.discount-create')).toHaveCount(0);
+  await expect(page.locator('input[type="password"]')).toBeVisible();
+});
+
+test('admin /giftcerts renders create form + list with status badges', async ({ page }) => {
+  await login(page);
+  await page.goto('/admin/giftcerts');
+
+  // Topbar version label is "Gift Certificates".
+  await expect(page.locator('.version-label')).toHaveText('Gift Certificates');
+
+  // Create form: amount + purchaser + recipient + email inputs + submit button.
+  await expect(page.locator('.discount-create')).toBeVisible();
+  await expect(page.locator('input[placeholder="Amount (USD)"]')).toBeVisible();
+  await expect(page.locator('input[placeholder="Purchaser name"]')).toBeVisible();
+  await expect(page.locator('input[placeholder="Recipient name"]')).toBeVisible();
+  await expect(page.locator('input[placeholder="Recipient email (optional)"]')).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: /Create Gift Certificate/ }),
+  ).toBeVisible();
+
+  // Existing list section header always present.
+  await expect(page.getByText('All Gift Certificates')).toBeVisible();
+
+  // Either at least one .dc-row OR the empty-state message.
+  const rowCount = await page.locator('#gc-list .dc-row').count();
+  const emptyVisible = await page.locator('.marketing-empty').isVisible().catch(() => false);
+  expect(rowCount > 0 || emptyVisible).toBe(true);
+
+  // If we have rows, each carries a status badge with a known class.
+  // Note: `.gc-status` has `text-transform: uppercase` in admin/style.css,
+  // so `innerText` returns the rendered (uppercase) form.
+  if (rowCount > 0) {
+    const statusEl = page.locator('.gc-status').first();
+    const text = await statusEl.innerText();
+    expect(['ACTIVE', 'REDEEMED', 'VOIDED']).toContain(text);
+  }
+});
+
+test('admin can create + void a gift cert end-to-end via API', async ({ page, request }) => {
+  await login(page);
+  const cookies = await page.context().cookies();
+  const cookieHeader = cookies.map((c) => `${c.name}=${c.value}`).join('; ');
+
+  // Create
+  const createRes = await request.post('http://localhost:3000/api/admin/giftcerts', {
+    headers: { 'Content-Type': 'application/json', Cookie: cookieHeader },
+    data: {
+      amount: 1,
+      purchaser_name: 'Playwright Test',
+      recipient_name: 'Auto Test Recipient',
+    },
+  });
+  expect(createRes.ok()).toBe(true);
+  const created = (await createRes.json()) as { giftcert: { id: string; code: string; value: number; is_active: boolean } };
+  expect(created.giftcert.code).toMatch(/^GIFT-[A-Z2-9]{4}-[A-Z2-9]{4}$/);
+  expect(Number(created.giftcert.value)).toBe(1);
+  expect(created.giftcert.is_active).toBe(true);
+
+  // Void
+  const voidRes = await request.patch(`http://localhost:3000/api/admin/giftcerts/${created.giftcert.id}`, {
+    headers: { 'Content-Type': 'application/json', Cookie: cookieHeader },
+    data: { is_active: false },
+  });
+  expect(voidRes.ok()).toBe(true);
+
+  // Confirm voided in list
+  const listRes = await request.get('http://localhost:3000/api/admin/giftcerts', {
+    headers: { Cookie: cookieHeader },
+  });
+  const list = (await listRes.json()) as { giftcerts: { id: string; is_active: boolean }[] };
+  const row = list.giftcerts.find((g) => g.id === created.giftcert.id);
+  expect(row).toBeDefined();
+  expect(row!.is_active).toBe(false);
+});
+
+test('admin list-view hamburger menu links Gift Certificates to /admin/giftcerts', async ({ page }) => {
+  await login(page);
+  await page.locator('button[aria-label="Menu"]').click();
+  const link = page.locator('.menu-dropdown a.menu-item', { hasText: 'Gift Certificates' });
+  await expect(link).toBeVisible();
+  await expect(link).toHaveAttribute('href', '/admin/giftcerts');
+  await link.click();
+  await page.waitForURL('**/admin/giftcerts');
+  await expect(page.locator('.discount-create')).toBeVisible();
+});

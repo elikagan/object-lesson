@@ -79,3 +79,32 @@ export type Sale = {
   posted_by: string | null;
   created_at: string;
 };
+
+/**
+ * GiftCert — row in `public.discount_codes` with `is_gift_certificate = true`.
+ * The same table holds discount codes (marketing) and gift cert codes; the
+ * boolean discriminator splits them. Field shapes confirmed against
+ * `migration-backup/cutover-{date}/discount_codes.json`.
+ */
+export type GiftCert = {
+  id: string;
+  code: string;
+  type: 'fixed';
+  value: number;
+  max_uses: number;
+  used_count: number;
+  is_active: boolean;
+  is_gift_certificate: true;
+  purchaser_name: string | null;
+  recipient_name: string | null;
+  purchaser_email: string | null;
+  created_at: string;
+};
+
+export type GiftCertStatus = 'Active' | 'Redeemed' | 'Voided';
+
+export function giftCertStatus(g: GiftCert): GiftCertStatus {
+  if (!g.is_active) return 'Voided';
+  if (g.used_count >= (g.max_uses || 1)) return 'Redeemed';
+  return 'Active';
+}
