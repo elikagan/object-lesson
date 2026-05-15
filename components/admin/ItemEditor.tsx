@@ -414,8 +414,25 @@ export function ItemEditor({
     }
   }
 
+  // Show the busy overlay whenever a long operation is in flight. `status`
+  // gives the user a per-stage message (AI substep names, "Saving…",
+  // "Uploading photos…") so they know something specific is happening.
+  const busy = saving || aiBusy;
+  const busyLabel =
+    status
+    || (aiBusy ? 'Processing…' : '')
+    || (saving ? 'Saving…' : '');
+
   return (
     <div id="view-editor" className="view">
+      {busy && (
+        <div className="busy-overlay" role="status" aria-live="polite">
+          <div className="busy-card">
+            <span className="busy-spinner" aria-hidden="true" />
+            <p className="busy-label">{busyLabel || 'Working…'}</p>
+          </div>
+        </div>
+      )}
       <header className="topbar">
         <button
           className="icon-btn"
