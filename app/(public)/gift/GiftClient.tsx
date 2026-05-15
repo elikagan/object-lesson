@@ -2,8 +2,9 @@
 
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import styles from './gift.module.css';
+import { trackEvent } from '@/lib/analytics';
 
 const CHECKOUT_URL = '/api/gift-checkout';
 
@@ -124,6 +125,13 @@ function GiftConfirmation({ code }: { code: string }) {
   const [copied, setCopied] = useState(false);
   const shareSubject = 'Gift Certificate for Object Lesson';
   const shareText = `Here's a gift certificate for Object Lesson!\n\nCode: ${code}\n\nUse it at objectlesson.la or in-store in Pasadena. It doesn't expire.`;
+
+  // Fire `gift_purchase` exactly once when the confirmation view mounts.
+  // Re-mounting via the back button doesn't re-fire because Next.js routes
+  // away from this view on any navigation that loses `?purchased=1`.
+  useEffect(() => {
+    trackEvent('gift_purchase');
+  }, []);
   const isMobile =
     typeof navigator !== 'undefined' && /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 

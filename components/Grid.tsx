@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { Item } from '@/lib/types';
 import { FILTER_OPTIONS } from '@/lib/types';
 import { thumbUrl, heroOf, isItemNew, filterItems } from '@/lib/items';
+import { trackEvent } from '@/lib/analytics';
 
 /**
  * Grid + filter dropdown.
@@ -61,6 +62,9 @@ export function Grid({ items }: { items: Item[] }) {
                 onClick={() => {
                   setFilter(opt.value);
                   setOpen(false);
+                  // Only fire when the filter actually changes — opening
+                  // the dropdown and re-selecting "all" is not a filter event.
+                  if (opt.value !== filter) trackEvent('filter');
                 }}
               >
                 {opt.label}

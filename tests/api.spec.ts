@@ -90,3 +90,70 @@ test('GET /api/admin/sales returns sales when authed', async ({ request, page })
   const body = await res.json();
   expect(Array.isArray(body.sales)).toBe(true);
 });
+
+// ─────────────────────────────────────────────────────────────────
+// Analytics events (P1-13)
+// ─────────────────────────────────────────────────────────────────
+
+const EVENTS_URL = 'http://localhost:3000/api/events';
+
+test('POST /api/events rejects unknown event type', async ({ request }) => {
+  const res = await request.post(EVENTS_URL, {
+    headers: { 'Content-Type': 'application/json' },
+    data: { event: 'not_an_event', session_id: 'test-sid-' + Date.now() },
+  });
+  expect(res.status()).toBe(400);
+});
+
+test('POST /api/events rejects missing session_id', async ({ request }) => {
+  const res = await request.post(EVENTS_URL, {
+    headers: { 'Content-Type': 'application/json' },
+    data: { event: 'page_view' },
+  });
+  expect(res.status()).toBe(400);
+});
+
+test('POST /api/events accepts a valid page_view (204)', async ({ request }) => {
+  const res = await request.post(EVENTS_URL, {
+    headers: { 'Content-Type': 'application/json' },
+    data: {
+      event: 'page_view',
+      session_id: 'test-pageview-' + Date.now(),
+      path: '/',
+      ua_mobile: false,
+      referrer: null,
+      utm_source: null,
+    },
+  });
+  expect(res.status()).toBe(204);
+});
+
+test('POST /api/events silently drops requests from bot user-agents', async ({ request }) => {
+  const res = await request.post(EVENTS_URL, {
+    headers: {
+      'Content-Type': 'application/json',
+      'User-Agent': 'Googlebot/2.1 (+http://www.google.com/bot.html)',
+    },
+    data: {
+      event: 'page_view',
+      session_id: 'test-bot-' + Date.now(),
+      path: '/',
+    },
+  });
+  // 204 (silent acknowledgement) — bot detection doesn't tip off scrapers
+  // with a 4xx response.
+  expect(res.status()).toBe(204);
+});
+
+test('POST /api/events accepts a session_end with a duration', async ({ request }) => {
+  const res = await request.post(EVENTS_URL, {
+    headers: { 'Content-Type': 'application/json' },
+    data: {
+      event: 'session_end',
+      session_id: 'test-sessionend-' + Date.now(),
+      duration: 42,
+      path: '/',
+    },
+  });
+  expect(res.status()).toBe(204);
+});

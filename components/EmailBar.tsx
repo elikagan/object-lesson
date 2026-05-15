@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import { trackEvent } from '@/lib/analytics';
 
 /**
  * Bottom-of-screen email capture bar offering 10% off code "WELCOME10".
@@ -49,6 +50,7 @@ export function EmailBar() {
     } catch {
       /* swallow — non-critical */
     }
+    trackEvent('email_signup');
     localStorage.setItem('ol_email_collected', '1');
     localStorage.setItem('ol_email_dismissed', '1');
     setSubmitted(true);
