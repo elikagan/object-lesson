@@ -172,7 +172,6 @@ export function AdminListView({ items: initialItems, version }: { items: Item[];
               </svg>
             </button>
             <div className={`menu-dropdown${menuOpen ? '' : ' hidden'}`}>
-              {/* Marketing remains wired to the v1 hash route until P1-17 ships. */}
               <a className="menu-item" href="/admin/analytics">
                 <MenuIcon name="analytics" />
                 Analytics
@@ -185,7 +184,7 @@ export function AdminListView({ items: initialItems, version }: { items: Item[];
                 <MenuIcon name="giftcerts" />
                 Gift Certificates
               </a>
-              <a className="menu-item" href="https://objectlesson.la/admin/#marketing" target="_blank" rel="noopener noreferrer">
+              <a className="menu-item" href="/admin/marketing">
                 <MenuIcon name="marketing" />
                 Marketing
               </a>

@@ -262,14 +262,14 @@ v1 had `trackEvent()` calls scattered across the public site. v2 had zero analyt
 
 ### 2.11 Marketing view (admin)
 
-**Status: ❌ NOT BUILT in v2.**
+**Status: ✅ Built in v2 (PR #18)** at `/admin/marketing`. Same PR closes P0-1 (last dead hamburger link).
 
-| Feature | v1 ref | Severity |
-|---|---|---|
-| Email subscribers table + count | `admin/app.js:1953-1997` | P1 |
-| CSV export | `admin/app.js:1981-1992` | P1 |
-| Discount code list (excl gift certs) with active toggle | `admin/app.js:1999-2055` | P1 |
-| Create discount code form (code, type, value, max uses, "Random" generator) | `admin/app.js:2057-2106` | P1 |
+| Feature | v1 ref | Severity | v2 |
+|---|---|---|---|
+| Email subscribers table + count | `admin/app.js:1953-1997` | P1 | ✅ `AdminMarketingView.tsx` |
+| CSV export | `admin/app.js:1981-1992` | P1 | ✅ |
+| Discount code list (excl gift certs) with active toggle | `admin/app.js:1999-2055` | P1 | ✅ `PATCH /api/admin/discounts/[id]` |
+| Create discount code form (code, type, value, max uses, "Random" generator) | `admin/app.js:2057-2106` | P1 | ✅ `POST /api/admin/discounts` |
 
 ### 2.12 Gift Certificates view (admin)
 
@@ -357,7 +357,7 @@ Order of work: P0 → P1 → P2. Within a tier, top to bottom. Don't skip.
 
 ### P0 — blocks revenue or admin operations
 
-- [ ] **P0-1 · Hamburger menu sub-views are dead links.** All four (Analytics / Sales / Gift Certificates / Marketing) point at `https://objectlesson.la/admin/#analytics` etc. — after Phase 7 cutover that URL is v2 itself, so the fragment goes nowhere. See §2.2. Fix: either build the four sub-views (P0-2/3/4 plus Marketing P1-17), or replace the menu with the items we actually have. Decide first; don't ship dead links.
+- [x] **P0-1 · Hamburger menu sub-views are dead links.** All four (Analytics / Sales / Gift Certificates / Marketing) point at `https://objectlesson.la/admin/#analytics` etc. — after Phase 7 cutover that URL is v2 itself, so the fragment goes nowhere. See §2.2. Fix: either build the four sub-views (P0-2/3/4 plus Marketing P1-17), or replace the menu with the items we actually have. Decide first; don't ship dead links.
 - [x] **P0-2 · Admin Sales view — not built.** §2.10. v1 had a transaction list with All-Time / Month / Today revenue cards and per-row customer/posted-by/code/discount. Data source already exists at `/api/admin/sales`. Just need the UI.
 - [x] **P0-3 · Admin Analytics dashboard — not built.** §2.9. v1 had range toggle (1d/7d/30d/90d), sparkline, conversion funnel, top items, categories, traffic sources, devices, revenue. **Note:** dashboard is empty until P1-13 (analytics writes) is fixed.
 - [x] **P0-4 · Admin Gift Certificates view — not built.** §2.12. Create + list + void. Without this you cannot view, create, or void gift certs without going back to v1. Depends on P1-19 (`/send-gift-email` endpoint) for the auto-email flow.
@@ -376,7 +376,7 @@ Order of work: P0 → P1 → P2. Within a tier, top to bottom. Don't skip.
 - [ ] **P1-14 · Per-photo AI exempt toggle — not built.** §2.5. v1 had a star button on each unprocessed photo to skip background-removal (e.g. tape-measure photos). The `aiProcess` field is in the v2 type but no UI toggles it.
 - [ ] **P1-15 · Per-photo reprocess menu — not built.** §2.5. v1 had three options per processed photo: Better lighting / Better background / Better shadow. Each maps to a Gemini prompt in `lib/admin/gemini.ts` (port from v1 `admin/app.js:962-1022`).
 - [ ] **P1-16 · Drag-to-reorder photos in editor — not built.** §2.5. v1 used Sortable.js with 150ms touch delay. Reorder must update both the `images` array order and which photo is `hero_image` (first one).
-- [ ] **P1-17 · Admin Marketing view — not built.** §2.11. Email subscribers table + count + CSV export, plus discount codes list with create/toggle-active. Filters out gift certs (those live in P0-4).
+- [x] **P1-17 · Admin Marketing view — not built.** §2.11. Email subscribers table + count + CSV export, plus discount codes list with create/toggle-active. Filters out gift certs (those live in P0-4).
 - [ ] **P1-18 · Privacy page (`/privacy`) — not ported.** §1.8. Static page; v1 source is `privacy/index.html` (96 lines). Required disclosure for Meta Pixel / GDPR.
 - [ ] **P1-19 · `/send-gift-email` endpoint — not ported.** §3.1. Needed by P0-4 (admin Gift Cert create with optional auto-send). Mirrors v1 worker `handleSendGiftEmail` — Resend API call with the gift-cert HTML template.
 - [ ] **P1-20 · PIN rate limiting.** §2.1. v1: 5 attempts → 5-minute lockout. Verify v2 enforces this (or build it).
