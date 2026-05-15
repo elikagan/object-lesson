@@ -108,3 +108,31 @@ export function giftCertStatus(g: GiftCert): GiftCertStatus {
   if (g.used_count >= (g.max_uses || 1)) return 'Redeemed';
   return 'Active';
 }
+
+/**
+ * Email subscriber — row in `public.emails`. Written by the EmailBar on
+ * newsletter signup, by the Square webhook on purchase, and by the email
+ * gate before Buy Now.
+ */
+export type EmailSubscriber = {
+  email: string;
+  source: string;
+  discount_code: string | null;
+  created_at: string;
+};
+
+/**
+ * DiscountCode — row in `public.discount_codes` with
+ * `is_gift_certificate = false`. Gift certs use the same table but are
+ * surfaced through a different admin view (`/admin/giftcerts`).
+ */
+export type DiscountCode = {
+  id: string;
+  code: string;
+  type: 'percent' | 'fixed';
+  value: number;
+  is_active: boolean;
+  max_uses: number | null;
+  used_count: number;
+  created_at: string;
+};

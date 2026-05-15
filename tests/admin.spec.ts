@@ -562,3 +562,129 @@ test('admin list-view hamburger menu links Analytics to /admin/analytics', async
   await link.click();
   await page.waitForURL('**/admin/analytics**');
 });
+
+// ─────────────────────────────────────────────────────────────────
+// Admin Marketing view (P1-17 — closes P0-1)
+// ─────────────────────────────────────────────────────────────────
+
+test('admin /marketing requires PIN (redirects to lock screen when not authed)', async ({ page }) => {
+  await page.goto('/admin/marketing');
+  await expect(page.locator('.marketing-table')).toHaveCount(0);
+  await expect(page.locator('input[type="password"]')).toBeVisible();
+});
+
+test('admin /marketing renders subscriber count + CSV button + create form', async ({ page }) => {
+  await login(page);
+  await page.goto('/admin/marketing');
+  await expect(page.locator('.version-label')).toHaveText('Marketing');
+  // Two sections present.
+  await expect(page.getByText('Email Subscribers')).toBeVisible();
+  await expect(page.getByText('Discount Codes')).toBeVisible();
+  // Export CSV button exists.
+  await expect(page.getByRole('button', { name: /Export CSV/ })).toBeVisible();
+  // Discount-code create form fields exist.
+  await expect(page.locator('input[placeholder="CODE"]')).toBeVisible();
+  await expect(page.getByRole('button', { name: /^Random$/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /Create Code/ })).toBeVisible();
+});
+
+test('admin can create + toggle a discount code via API', async ({ page, request }) => {
+  await login(page);
+  const cookies = await page.context().cookies();
+  const cookieHeader = cookies.map((c) => `${c.name}=${c.value}`).join('; ');
+
+  const code = `PWTEST_${Date.now()}`;
+
+  const createRes = await request.post('http://localhost:3000/api/admin/discounts', {
+    headers: { 'Content-Type': 'application/json', Cookie: cookieHeader },
+    data: { code, type: 'percent', value: 10, max_uses: 5 },
+  });
+  expect(createRes.ok()).toBe(true);
+  const created = (await createRes.json()) as { discount: { id: string; code: string; is_active: boolean } };
+  expect(created.discount.code).toBe(code);
+  expect(created.discount.is_active).toBe(true);
+
+  // Toggle off
+  const offRes = await request.patch(
+    `http://localhost:3000/api/admin/discounts/${created.discount.id}`,
+    {
+      headers: { 'Content-Type': 'application/json', Cookie: cookieHeader },
+      data: { is_active: false },
+    },
+  );
+  expect(offRes.ok()).toBe(true);
+
+  // Confirm via list
+  const listRes = await request.get('http://localhost:3000/api/admin/discounts', {
+    headers: { Cookie: cookieHeader },
+  });
+  const list = (await listRes.json()) as { discounts: { id: string; is_active: boolean }[] };
+  const row = list.discounts.find((d) => d.id === created.discount.id);
+  expect(row).toBeDefined();
+  expect(row!.is_active).toBe(false);
+});
+
+test('admin /api/admin/discounts excludes gift cert rows', async ({ page, request }) => {
+  await login(page);
+  const cookies = await page.context().cookies();
+  const cookieHeader = cookies.map((c) => `${c.name}=${c.value}`).join('; ');
+
+  const listRes = await request.get('http://localhost:3000/api/admin/discounts', {
+    headers: { Cookie: cookieHeader },
+  });
+  expect(listRes.ok()).toBe(true);
+  const list = (await listRes.json()) as { discounts: { code: string }[] };
+  // Gift cert codes look like GIFT-XXXX-XXXX. None should appear here.
+  for (const d of list.discounts) {
+    expect(d.code).not.toMatch(/^GIFT-/);
+  }
+});
+
+test('admin /api/admin/discounts/[id] refuses to touch gift cert rows', async ({ page, request }) => {
+  await login(page);
+  const cookies = await page.context().cookies();
+  const cookieHeader = cookies.map((c) => `${c.name}=${c.value}`).join('; ');
+
+  // Find an existing gift cert via the giftcerts API.
+  const gcList = await request.get('http://localhost:3000/api/admin/giftcerts', {
+    headers: { Cookie: cookieHeader },
+  });
+  const { giftcerts } = (await gcList.json()) as { giftcerts: { id: string }[] };
+  if (giftcerts.length === 0) test.skip();
+
+  const res = await request.patch(
+    `http://localhost:3000/api/admin/discounts/${giftcerts[0].id}`,
+    {
+      headers: { 'Content-Type': 'application/json', Cookie: cookieHeader },
+      data: { is_active: false },
+    },
+  );
+  expect(res.status()).toBe(400);
+});
+
+test('admin list-view hamburger menu links Marketing to /admin/marketing (P0-1 closer)', async ({ page }) => {
+  await login(page);
+  await page.locator('button[aria-label="Menu"]').click();
+  const link = page.locator('.menu-dropdown a.menu-item', { hasText: 'Marketing' });
+  await expect(link).toBeVisible();
+  await expect(link).toHaveAttribute('href', '/admin/marketing');
+  await link.click();
+  await page.waitForURL('**/admin/marketing');
+  await expect(page.getByText('Email Subscribers')).toBeVisible();
+});
+
+test('admin hamburger menu has zero dead links (all destinations are in-app)', async ({ page }) => {
+  await login(page);
+  await page.locator('button[aria-label="Menu"]').click();
+  // Every menu item href must be a relative in-app route. No more
+  // https://objectlesson.la/admin/# hash URLs.
+  const hrefs = await page.locator('.menu-dropdown a.menu-item').evaluateAll((els) =>
+    (els as HTMLAnchorElement[]).map((a) => a.getAttribute('href') ?? ''),
+  );
+  expect(hrefs.length).toBeGreaterThan(0);
+  for (const href of hrefs) {
+    expect(href.startsWith('/admin/')).toBe(true);
+    expect(href).not.toContain('objectlesson.la');
+    expect(href).not.toContain('#');
+  }
+});
