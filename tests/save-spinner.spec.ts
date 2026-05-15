@@ -70,3 +70,53 @@ test('clicking Save in /admin/items/new shows the busy overlay with a spinner', 
   }
 });
 
+test('save failure surfaces a sticky red banner with a human-readable message', async ({ page }) => {
+  await login(page);
+  await page.goto('/admin/items/new');
+  await page.locator('input[placeholder="Item title"]').fill('_test_banner_' + Date.now());
+  await page.locator('select').first().selectOption('misc');
+
+  // Force the POST to return the exact 500 we saw in production: a CHECK
+  // constraint violation on items.condition.
+  await page.route('**/api/admin/items', (route) => {
+    if (route.request().method() === 'POST') {
+      return route.fulfill({
+        status: 500,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          error: 'new row for relation "items" violates check constraint "items_condition_check"',
+        }),
+      });
+    }
+    return route.continue();
+  });
+
+  await page.locator('button.btn-primary').click();
+
+  // Banner appears, stays visible, and contains a humanized message — NOT
+  // the raw Postgres error.
+  const banner = page.locator('.save-error-banner');
+  await expect(banner).toBeVisible({ timeout: 5000 });
+  const text = await page.locator('.save-error-text').textContent();
+  expect(text).not.toContain('violates check constraint');
+  expect(text).toContain('Condition');
+
+  // Dismiss button removes the banner.
+  await page.locator('.save-error-dismiss').click();
+  await expect(banner).toHaveCount(0);
+});
+
+test('client-side validation blocks AI-suggested conditions outside the enum', async ({ page }) => {
+  // We exercise the lib path directly by importing the editor module would
+  // be the cleanest unit test, but here we sanity-check via DOM: the
+  // condition <select> only offers the four allowed options. Anything else
+  // can't reach the database.
+  await login(page);
+  await page.goto('/admin/items/new');
+  const options = await page.locator('select').nth(1).evaluate((el) =>
+    Array.from((el as HTMLSelectElement).options).map((o) => o.value),
+  );
+  // First option is empty (the "Select…" placeholder), then the four enum values.
+  expect(options).toEqual(['', 'New', 'Like New', 'Good', 'Fair']);
+});
+
