@@ -275,16 +275,16 @@ v1 has `trackEvent()` calls for these. **v2 has zero analytics writes** — conf
 
 ### 2.12 Gift Certificates view (admin)
 
-**Status: ❌ NOT BUILT in v2.**
+**Status: ✅ Built in v2 (PR #15)** at `/admin/giftcerts`. Auto-email pending P1-19.
 
-| Feature | v1 ref | Severity |
-|---|---|---|
-| Create form (amount, purchaser, recipient, recipient email) | `admin/index.html:267-285`, `admin/app.js:2172-2247` | P1 |
-| Auto-generate `GIFT-XXXX-XXXX` (32-char no-ambiguous alphabet) | `admin/app.js:2182-2186` | P1 |
-| Insert with `is_gift_certificate=true`, `type=fixed`, `max_uses=1` | `admin/app.js:2192-2199` | P1 |
-| Auto-email if recipient email provided (`/send-gift-email`) | `admin/app.js:2221-2231` | P1 |
-| List view: code, status (Active/Redeemed/Voided), amount, names, email, date | `admin/app.js:2125-2143` | P1 |
-| Void button | `admin/app.js:2141, 2145-2165` | P1 |
+| Feature | v1 ref | Severity | v2 |
+|---|---|---|---|
+| Create form (amount, purchaser, recipient, recipient email) | `admin/index.html:267-285`, `admin/app.js:2172-2247` | P1 | ✅ `AdminGiftCertsView.tsx` |
+| Auto-generate `GIFT-XXXX-XXXX` (32-char no-ambiguous alphabet) | `admin/app.js:2182-2186` | P1 | ✅ server-side in `POST /api/admin/giftcerts` |
+| Insert with `is_gift_certificate=true`, `type=fixed`, `max_uses=1` | `admin/app.js:2192-2199` | P1 | ✅ |
+| Auto-email if recipient email provided (`/send-gift-email`) | `admin/app.js:2221-2231` | P1 | ⚠️ stored on row but not auto-sent — wires up when P1-19 ships |
+| List view: code, status (Active/Redeemed/Voided), amount, names, email, date | `admin/app.js:2125-2143` | P1 | ✅ |
+| Void button | `admin/app.js:2141, 2145-2165` | P1 | ✅ `PATCH /api/admin/giftcerts/[id]` (only on Active rows) |
 
 ### 2.13 Settings view (admin)
 
@@ -362,7 +362,7 @@ Order of work: P0 → P1 → P2. Within a tier, top to bottom. Don't skip.
 - [ ] **P0-1 · Hamburger menu sub-views are dead links.** All four (Analytics / Sales / Gift Certificates / Marketing) point at `https://objectlesson.la/admin/#analytics` etc. — after Phase 7 cutover that URL is v2 itself, so the fragment goes nowhere. See §2.2. Fix: either build the four sub-views (P0-2/3/4 plus Marketing P1-17), or replace the menu with the items we actually have. Decide first; don't ship dead links.
 - [x] **P0-2 · Admin Sales view — not built.** §2.10. v1 had a transaction list with All-Time / Month / Today revenue cards and per-row customer/posted-by/code/discount. Data source already exists at `/api/admin/sales`. Just need the UI.
 - [ ] **P0-3 · Admin Analytics dashboard — not built.** §2.9. v1 had range toggle (1d/7d/30d/90d), sparkline, conversion funnel, top items, categories, traffic sources, devices, revenue. **Note:** dashboard is empty until P1-13 (analytics writes) is fixed.
-- [ ] **P0-4 · Admin Gift Certificates view — not built.** §2.12. Create + list + void. Without this you cannot view, create, or void gift certs without going back to v1. Depends on P1-19 (`/send-gift-email` endpoint) for the auto-email flow.
+- [x] **P0-4 · Admin Gift Certificates view — not built.** §2.12. Create + list + void. Without this you cannot view, create, or void gift certs without going back to v1. Depends on P1-19 (`/send-gift-email` endpoint) for the auto-email flow.
 - [ ] **P0-5 · End-to-end checkout untested.** Run the $1 test purchase: Buy Now → Square → return to site with `?purchased=1` → thank-you card shows. Verify item is marked sold, sale row written, buyer email captured. Hold per Eli pending mechanical safeguards in place — now in place.
 - [ ] **P0-6 · Webhook end-to-end untested.** §3.2. With the $1 test (P0-5) verify: signature validates, item flipped sold, buyer email landed in `emails`, sale row written with cardholder name + posted_by + payment id. Same test exercises gift-cert email path if the test purchase is a gift cert.
 - [ ] **P0-7 · Discount code apply at checkout — untested.** §3.3. Enter `WELCOME10` (or any active code) on a detail page → strikethrough + green discounted price → Buy Now → Square shows discounted total → on success `used_count` increments by 1.

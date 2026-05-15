@@ -109,11 +109,38 @@ jobs:
             const baseSha = context.payload.pull_request.base.sha;
             const headSha = context.payload.pull_request.head.sha;
 
-            // Find audit row IDs referenced in the title or body: P0-1, P1-13, P2-39, etc.
-            const idRe = /\bP[012]-\d+\b/g;
-            const titleIds = title.match(idRe) || [];
-            const bodyIds = body.match(idRe) || [];
-            const referenced = [...new Set([...titleIds, ...bodyIds])];
+            // Find audit row IDs the PR CLAIMS to close. Two narrow signals:
+            //
+            //   (a) Title leads with the ID, optionally with separators like
+            //       ":", "—", "-", "·", " " — e.g. "P0-2: ...", "P0-2 — ...".
+            //       That's the canonical "this PR closes P0-2" pattern.
+            //
+            //   (b) Body uses a closing keyword: "closes P0-2", "fixes P0-2",
+            //       "resolves P0-2", or the literal section heading
+            //       "## Audit row" or "Audit row" followed by the ID on the
+            //       same or next non-empty line.
+            //
+            // Bare mentions ("depends on P1-19", "blocked by P0-3") do NOT
+            // count — they're references, not closures.
+            const refs = new Set();
+
+            // (a) title prefix
+            const titleMatch = title.match(/^(P[012]-\d+)\b/);
+            if (titleMatch) refs.add(titleMatch[1]);
+
+            // (b1) explicit closing keywords
+            const closingRe = /\b(?:closes?|closing|fix(?:es|ing)?|resolves?|resolving)\s+(P[012]-\d+)\b/gi;
+            for (const m of body.matchAll(closingRe)) refs.add(m[1]);
+
+            // (b2) "## Audit row" section. Take the first audit ID that appears
+            // anywhere in the body content within ~400 chars of the heading.
+            const sectionMatch = body.match(/Audit row[^\n]*\n([\s\S]{0,400})/i);
+            if (sectionMatch) {
+              const inSection = sectionMatch[1].match(/\bP[012]-\d+\b/);
+              if (inSection) refs.add(inSection[0]);
+            }
+
+            const referenced = [...refs];
 
             if (referenced.length === 0) {
               core.info('No audit row IDs referenced — skipping sync check.');

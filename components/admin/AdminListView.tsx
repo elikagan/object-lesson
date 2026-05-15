@@ -182,7 +182,7 @@ export function AdminListView({ items: initialItems, version }: { items: Item[];
                 <MenuIcon name="sales" />
                 Sales
               </a>
-              <a className="menu-item" href="https://objectlesson.la/admin/#giftcerts" target="_blank" rel="noopener noreferrer">
+              <a className="menu-item" href="/admin/giftcerts">
                 <MenuIcon name="giftcerts" />
                 Gift Certificates
               </a>
