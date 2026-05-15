@@ -1405,3 +1405,40 @@ select.field:has(option[value=""]:checked) { color: var(--light); }
   margin: 0;
 }
 
+/* ───── Save error banner (item editor) ────────────────────────────────── */
+/* Sticky red banner at the top of the editor body when a save fails.
+   Replaces the silent-error UX where a failed save left a small grey <p>
+   at the bottom of the form, easy to miss. */
+.save-error-banner {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: #fdecec;
+  border: 1px solid #f5b5b5;
+  color: #8a1f1f;
+  padding: 12px 14px 12px 16px;
+  margin: 0 0 16px 0;
+  border-radius: 8px;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  font-size: 13px;
+  line-height: 1.45;
+}
+.save-error-text {
+  flex: 1;
+}
+.save-error-dismiss {
+  background: none;
+  border: none;
+  color: #8a1f1f;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 4px;
+  margin: -2px -4px 0 0;
+}
+.save-error-dismiss:hover {
+  color: #5a1212;
+}
+

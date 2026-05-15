@@ -42,6 +42,35 @@ const CATEGORIES: { value: Category; label: string }[] = [
 
 const CONDITIONS: Condition[] = ['New', 'Like New', 'Good', 'Fair'];
 
+/**
+ * Translate raw API errors (Postgres CHECK constraint violations, Supabase
+ * Storage errors, etc.) into a sentence an admin can act on. Falls back to
+ * the original message if we don't recognize it.
+ */
+function humanizeSaveError(raw: string): string {
+  // Postgres CHECK constraint violations look like:
+  //   "new row for relation \"items\" violates check constraint \"items_condition_check\""
+  // The constraint name tells us which field is bad.
+  const checkMatch = raw.match(/violates check constraint "items_(\w+)_check"/);
+  if (checkMatch) {
+    const field = checkMatch[1];
+    if (field === 'condition') {
+      return 'Condition must be New, Like New, Good, or Fair (or left blank). Please pick a valid option and save again.';
+    }
+    if (field === 'category') {
+      return 'Category is required and must be one of the listed options. Please pick a category and save again.';
+    }
+    return `The field "${field}" has an invalid value. Please correct it and save again.`;
+  }
+  if (raw.includes('duplicate key')) {
+    return 'An item with this ID already exists. Refresh the page to pick a fresh ID.';
+  }
+  if (raw === 'Photo upload failed' || raw.includes('upload')) {
+    return `Photo upload failed: ${raw}. Try removing and re-adding the photo, or save without it.`;
+  }
+  return raw;
+}
+
 type Mode = 'create' | 'edit';
 
 /**
@@ -95,6 +124,12 @@ export function ItemEditor({
 
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState('');
+  // Sticky error banner. The transient `status` text was too easy to miss when
+  // a save failed — admins reasonably concluded "Save did nothing" because
+  // the busy overlay disappeared on error and the error string lived in a
+  // small <p> at the bottom of the form. Errors now also surface in a fixed
+  // banner above the photo grid that stays until the admin dismisses it.
+  const [saveError, setSaveError] = useState('');
   const photoInputRef = useRef<HTMLInputElement>(null);
 
   function onAddPhotos(e: React.ChangeEvent<HTMLInputElement>) {
@@ -245,7 +280,18 @@ export function ItemEditor({
         if (sugg.title && !title) setTitle(sugg.title);
         if (sugg.description && !description) setDescription(sugg.description);
         if (sugg.maker && !maker) setMaker(sugg.maker);
-        if (sugg.condition && !condition) setCondition(sugg.condition);
+        // Condition has a DB CHECK constraint; AI freely returns prose like
+        // "Excellent" or "Good, minor wear to edges" which fails save with a
+        // 500. Only accept values in the enum, else leave the field empty
+        // and let the admin pick.
+        const allowedConditions: Condition[] = ['New', 'Like New', 'Good', 'Fair'];
+        if (
+          sugg.condition &&
+          !condition &&
+          (allowedConditions as string[]).includes(sugg.condition)
+        ) {
+          setCondition(sugg.condition);
+        }
         if (sugg.category && !category) {
           const allowed = ['wall-art', 'object', 'ceramic', 'furniture', 'light', 'sculpture', 'misc'];
           if (allowed.includes(sugg.category)) setCategory(sugg.category);
@@ -307,6 +353,7 @@ export function ItemEditor({
     if (saving) return;
     setSaving(true);
     setStatus('');
+    setSaveError('');
     try {
       if (!title.trim()) throw new Error('Title is required');
       if (!category) throw new Error('Category is required');
@@ -389,7 +436,9 @@ export function ItemEditor({
       router.push('/admin/items');
       router.refresh();
     } catch (err) {
-      setStatus(err instanceof Error ? err.message : String(err));
+      const msg = err instanceof Error ? err.message : String(err);
+      setStatus(msg);
+      setSaveError(humanizeSaveError(msg));
       setSaving(false);
     }
   }
@@ -458,6 +507,19 @@ export function ItemEditor({
       </header>
 
       <div className="editor-body">
+        {saveError && (
+          <div className="save-error-banner" role="alert">
+            <span className="save-error-text">{saveError}</span>
+            <button
+              type="button"
+              className="save-error-dismiss"
+              aria-label="Dismiss"
+              onClick={() => setSaveError('')}
+            >
+              ×
+            </button>
+          </div>
+        )}
         <section className="editor-section">
           <p className="section-label">Photos</p>
           <div className="photo-grid">
