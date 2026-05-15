@@ -172,9 +172,8 @@ export function AdminListView({ items: initialItems, version }: { items: Item[];
               </svg>
             </button>
             <div className={`menu-dropdown${menuOpen ? '' : ' hidden'}`}>
-              {/* Analytics / Gift Certificates / Marketing remain wired to the v1 hash routes
-                  until their respective sub-views ship in the AUDIT.md backlog. */}
-              <a className="menu-item" href="https://objectlesson.la/admin/#analytics" target="_blank" rel="noopener noreferrer">
+              {/* Marketing remains wired to the v1 hash route until P1-17 ships. */}
+              <a className="menu-item" href="/admin/analytics">
                 <MenuIcon name="analytics" />
                 Analytics
               </a>

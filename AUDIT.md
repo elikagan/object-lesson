@@ -232,25 +232,23 @@ v1 had `trackEvent()` calls scattered across the public site. v2 had zero analyt
 
 ### 2.9 Analytics dashboard (admin)
 
-**Status: ❌ NOT BUILT in v2.** This is one of the four broken hamburger items.
+**Status: ✅ Built in v2 (PR #17)** at `/admin/analytics`. Aggregation moved server-side; the browser never pulls raw events.
 
-| Feature | v1 ref | Severity |
-|---|---|---|
-| Range toggle: 1d / 7d / 30d / 90d | `admin/index.html:193-198` | P0 |
-| Pull-to-refresh on touch | `admin/app.js:270-281` | P2 |
-| Range views card (with delta vs prev period) | `admin/app.js:1741-1747` | P0 |
-| Avg time on site card | `admin/app.js:1748-1752` | P0 |
-| Today views card (when range != 1d) | `admin/app.js:1754-1760` | P1 |
-| Revenue card | `admin/app.js:1763-1768` | P0 |
-| Sparkline (hourly for 1d, daily otherwise) | `admin/app.js:1652-1677, 1773-1781` | P1 |
-| Conversion funnel (visitors → views → inquiries) | `admin/app.js:1679-1683, 1783-1801` | P1 |
-| Inquiries count card | `admin/app.js:1803-1807` | P1 |
-| Most viewed top 10 (with thumbs) | `admin/app.js:1685-1693, 1809-1827` | P1 |
-| Popular categories bar chart | `admin/app.js:1696-1705, 1829-1842` | P2 |
-| Traffic sources bar chart | `admin/app.js:1707-1722, 1844-1855` | P2 |
-| Devices (mobile vs desktop) | `admin/app.js:1724-1727, 1857-1873` | P2 |
-
-**Even if we ported the dashboard, it'd be empty until 1.6 (analytics writes) is fixed.**
+| Feature | v1 ref | Severity | v2 |
+|---|---|---|---|
+| Range toggle: 1d / 7d / 30d / 90d | `admin/index.html:193-198` | P0 | ✅ URL-driven (`?range=N`) |
+| Pull-to-refresh on touch | `admin/app.js:270-281` | P2 | ⚠️ not ported (SSR re-renders on navigation already) |
+| Range views card (with delta vs prev period) | `admin/app.js:1741-1747` | P0 | ✅ |
+| Avg time on site card | `admin/app.js:1748-1752` | P0 | ✅ |
+| Today views card (when range != 1d) | `admin/app.js:1754-1760` | P1 | ✅ |
+| Revenue card | `admin/app.js:1763-1768` | P0 | ✅ |
+| Sparkline (hourly for 1d, daily otherwise) | `admin/app.js:1652-1677, 1773-1781` | P1 | ✅ |
+| Conversion funnel (visitors → views → inquiries) | `admin/app.js:1679-1683, 1783-1801` | P1 | ✅ |
+| Inquiries count card | `admin/app.js:1803-1807` | P1 | ✅ |
+| Most viewed top 10 (with thumbs) | `admin/app.js:1685-1693, 1809-1827` | P1 | ✅ |
+| Popular categories bar chart | `admin/app.js:1696-1705, 1829-1842` | P2 | ✅ |
+| Traffic sources bar chart | `admin/app.js:1707-1722, 1844-1855` | P2 | ✅ |
+| Devices (mobile vs desktop) | `admin/app.js:1724-1727, 1857-1873` | P2 | ✅ |
 
 ### 2.10 Sales view (admin)
 
@@ -361,7 +359,7 @@ Order of work: P0 → P1 → P2. Within a tier, top to bottom. Don't skip.
 
 - [ ] **P0-1 · Hamburger menu sub-views are dead links.** All four (Analytics / Sales / Gift Certificates / Marketing) point at `https://objectlesson.la/admin/#analytics` etc. — after Phase 7 cutover that URL is v2 itself, so the fragment goes nowhere. See §2.2. Fix: either build the four sub-views (P0-2/3/4 plus Marketing P1-17), or replace the menu with the items we actually have. Decide first; don't ship dead links.
 - [x] **P0-2 · Admin Sales view — not built.** §2.10. v1 had a transaction list with All-Time / Month / Today revenue cards and per-row customer/posted-by/code/discount. Data source already exists at `/api/admin/sales`. Just need the UI.
-- [ ] **P0-3 · Admin Analytics dashboard — not built.** §2.9. v1 had range toggle (1d/7d/30d/90d), sparkline, conversion funnel, top items, categories, traffic sources, devices, revenue. **Note:** dashboard is empty until P1-13 (analytics writes) is fixed.
+- [x] **P0-3 · Admin Analytics dashboard — not built.** §2.9. v1 had range toggle (1d/7d/30d/90d), sparkline, conversion funnel, top items, categories, traffic sources, devices, revenue. **Note:** dashboard is empty until P1-13 (analytics writes) is fixed.
 - [x] **P0-4 · Admin Gift Certificates view — not built.** §2.12. Create + list + void. Without this you cannot view, create, or void gift certs without going back to v1. Depends on P1-19 (`/send-gift-email` endpoint) for the auto-email flow.
 - [ ] **P0-5 · End-to-end checkout untested.** Run the $1 test purchase: Buy Now → Square → return to site with `?purchased=1` → thank-you card shows. Verify item is marked sold, sale row written, buyer email captured. Hold per Eli pending mechanical safeguards in place — now in place.
 - [ ] **P0-6 · Webhook end-to-end untested.** §3.2. With the $1 test (P0-5) verify: signature validates, item flipped sold, buyer email landed in `emails`, sale row written with cardholder name + posted_by + payment id. Same test exercises gift-cert email path if the test purchase is a gift cert.
