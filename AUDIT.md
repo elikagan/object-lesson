@@ -366,7 +366,7 @@ Order of work: P0 → P1 → P2. Within a tier, top to bottom. Don't skip.
 - [ ] **P0-7 · Discount code apply at checkout — untested.** §3.3. Enter `WELCOME10` (or any active code) on a detail page → strikethrough + green discounted price → Buy Now → Square shows discounted total → on success `used_count` increments by 1.
 - [x] **P0-8 · Filter dropdown parity.** §1.2. Verify all 9 options (`all`, `under-400`, plus 7 categories), `under-400` filters to non-sold items where `0 < price < 400`, click-outside closes, sold-items-pushed-to-end on `all`.
 - [x] **P0-9 · Touch carousel on detail page.** §1.3. Verify on a real phone: finger-following drag, vertical-vs-horizontal direction lock, 0.3x edge resistance at boundaries, 20% width threshold to advance, smooth snap-back. Single-image items hide thumb strip.
-- [ ] **P0-10 · Drag-to-reorder items in admin list.** §2.3. Verify: drag handle works, reorder persists across reload (writes to `items.display_order` or equivalent), archive (sold) section is excluded from reorder.
+- [x] **P0-10 · Drag-to-reorder items in admin list.** §2.3. Verify: drag handle works, reorder persists across reload (writes to `items.display_order` or equivalent), archive (sold) section is excluded from reorder.
 - [ ] **P0-11 · Email gate before Buy Now.** §1.3. Verify: first-time buyer (no `ol_email_collected` in localStorage) clicks Buy Now → email gate appears → submit → row written to `emails` with `source='abandoned_cart'`, `item_id` set → checkout proceeds. Subsequent buys skip the gate.
 - [ ] **P0-12 · Square webhook signature validation — hardened.** §3.2. Verify: signature mismatch returns non-2xx (v1 logged a warning and continued — fix that here). Test with a deliberately bad signature.
 
