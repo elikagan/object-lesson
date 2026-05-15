@@ -516,3 +516,49 @@ test('navigating to an item fires item_view', async ({ page }) => {
   expect(body.event).toBe('item_view');
   expect(body.item_id).toBeTruthy();
 });
+
+// ─────────────────────────────────────────────────────────────────
+// Admin Analytics dashboard (P0-3)
+// ─────────────────────────────────────────────────────────────────
+
+test('admin /analytics requires PIN (redirects to lock screen when not authed)', async ({ page }) => {
+  await page.goto('/admin/analytics');
+  await expect(page.locator('.analytics-cards')).toHaveCount(0);
+  await expect(page.locator('input[type="password"]')).toBeVisible();
+});
+
+test('admin /analytics renders summary cards + range toggle', async ({ page }) => {
+  await login(page);
+  await page.goto('/admin/analytics?range=7');
+  await expect(page.locator('.version-label')).toHaveText('Analytics');
+  await expect(page.locator('.range-toggle')).toBeVisible();
+  // Four range buttons.
+  await expect(page.locator('.range-btn')).toHaveCount(4);
+  // 7d button must be active (URL says range=7).
+  await expect(page.locator('.range-btn.active')).toHaveText('7d');
+
+  // Either the cards rendered (data flowed) OR the empty-state message
+  // shows. Both are valid; this test just confirms the page didn't crash.
+  const cards = await page.locator('.analytics-cards').count();
+  const empty = await page.locator('.analytics-empty').count();
+  expect(cards + empty).toBeGreaterThan(0);
+});
+
+test('admin /analytics range toggle changes the URL and active button', async ({ page }) => {
+  await login(page);
+  await page.goto('/admin/analytics?range=7');
+  // Click 30d
+  await page.locator('.range-btn', { hasText: '30d' }).click();
+  await page.waitForURL('**/admin/analytics?range=30');
+  await expect(page.locator('.range-btn.active')).toHaveText('30d');
+});
+
+test('admin list-view hamburger menu links Analytics to /admin/analytics', async ({ page }) => {
+  await login(page);
+  await page.locator('button[aria-label="Menu"]').click();
+  const link = page.locator('.menu-dropdown a.menu-item', { hasText: 'Analytics' });
+  await expect(link).toBeVisible();
+  await expect(link).toHaveAttribute('href', '/admin/analytics');
+  await link.click();
+  await page.waitForURL('**/admin/analytics**');
+});
