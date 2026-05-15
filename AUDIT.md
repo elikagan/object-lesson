@@ -80,24 +80,24 @@
 | `email_signup` analytics event | `app.js:818` | ❌ | P1 | No `trackEvent` in v2 |
 | Success state shows code 'WELCOME10', auto-hide 6s | `app.js:818-824` | ⚠️ | P2 | Verify |
 
-### 1.6 Analytics — **broadest gap**
+### 1.6 Analytics — **broadest gap** (closed in PR #16)
 
-v1 has `trackEvent()` calls for these. **v2 has zero analytics writes** — confirmed by grep. The Supabase `events` table is going dark.
+v1 had `trackEvent()` calls scattered across the public site. v2 had zero analytics writes after Phase 7 cutover. PR #16 ported the trackEvent helper to `lib/analytics.ts`, added `POST /api/events`, and wired calls into the public layout, ItemDetail, Grid, EmailBar, and GiftClient. Events flow again.
 
 | Event | v1 ref | v2 status | Severity |
 |---|---|---|---|
-| `page_view` | `app.js:128` (storefront), `gift/index.html:301` (gift page) | ❌ | P1 |
-| `item_view` | `app.js:209` | ❌ | P1 |
-| `inquire` | `app.js:302, 309` | ❌ | P1 |
-| `buy_now` | `app.js:329` | ❌ | P1 |
-| `filter` | `app.js:503` | ❌ | P2 |
-| `email_signup` | `app.js:818` | ❌ | P1 |
-| `discount_applied` | `app.js:906` | ❌ | P2 |
-| `session_end` (with duration) | `app.js:78` | ❌ | P2 |
-| `gift_purchase` (gift page) | `gift/index.html:355` | ❌ | P1 |
-| Bot/crawler exclusion (UA regex) | `app.js:40` | ❌ | P1 |
-| Session ID per visitor | `app.js:18-25` | ❌ | P1 |
-| UTM source capture | `app.js:27-32` | ❌ | P1 |
+| `page_view` | `app.js:128` (storefront), `gift/index.html:301` (gift page) | ✅ `AnalyticsTracker.tsx` (on pathname change) | P1 |
+| `item_view` | `app.js:209` | ✅ `ItemDetail.tsx` (on mount) | P1 |
+| `inquire` | `app.js:302, 309` | ✅ `ItemDetail.tsx` (on click) | P1 |
+| `buy_now` | `app.js:329` | ✅ `ItemDetail.tsx` (on checkout submit) | P1 |
+| `filter` | `app.js:503` | ✅ `Grid.tsx` (on filter change) | P2 |
+| `email_signup` | `app.js:818` | ✅ `EmailBar.tsx` (on submit) | P1 |
+| `discount_applied` | `app.js:906` | ✅ `ItemDetail.tsx` (on apply success) | P2 |
+| `session_end` (with duration) | `app.js:78` | ✅ `AnalyticsTracker.tsx` (visibilitychange + pagehide) | P2 |
+| `gift_purchase` (gift page) | `gift/index.html:355` | ✅ `GiftClient.tsx` (confirmation mount) | P1 |
+| Bot/crawler exclusion (UA regex) | `app.js:40` | ✅ client + server defense-in-depth | P1 |
+| Session ID per visitor | `app.js:18-25` | ✅ sessionStorage `ol_sid` | P1 |
+| UTM source capture | `app.js:27-32` | ✅ cached on first call | P1 |
 
 ### 1.7 Gift certificate purchase page (`/gift`)
 
@@ -374,7 +374,7 @@ Order of work: P0 → P1 → P2. Within a tier, top to bottom. Don't skip.
 
 ### P1 — data loss / known-bad UX
 
-- [ ] **P1-13 · No analytics writes anywhere in v2.** §1.6. v1 wrote 8+ event types (`page_view`, `item_view`, `inquire`, `buy_now`, `filter`, `email_signup`, `discount_applied`, `session_end`, `gift_purchase`) to Supabase `events`. v2 writes none. Port the `trackEvent()` helper + bot-UA filter + session-id + UTM capture, then sprinkle the calls. The events table is currently going dark.
+- [x] **P1-13 · No analytics writes anywhere in v2.** §1.6. v1 wrote 8+ event types (`page_view`, `item_view`, `inquire`, `buy_now`, `filter`, `email_signup`, `discount_applied`, `session_end`, `gift_purchase`) to Supabase `events`. v2 writes none. Port the `trackEvent()` helper + bot-UA filter + session-id + UTM capture, then sprinkle the calls. The events table is currently going dark.
 - [ ] **P1-14 · Per-photo AI exempt toggle — not built.** §2.5. v1 had a star button on each unprocessed photo to skip background-removal (e.g. tape-measure photos). The `aiProcess` field is in the v2 type but no UI toggles it.
 - [ ] **P1-15 · Per-photo reprocess menu — not built.** §2.5. v1 had three options per processed photo: Better lighting / Better background / Better shadow. Each maps to a Gemini prompt in `lib/admin/gemini.ts` (port from v1 `admin/app.js:962-1022`).
 - [ ] **P1-16 · Drag-to-reorder photos in editor — not built.** §2.5. v1 used Sortable.js with 150ms touch delay. Reorder must update both the `images` array order and which photo is `hero_image` (first one).

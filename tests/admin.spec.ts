@@ -473,3 +473,46 @@ test('admin list-view hamburger menu links Gift Certificates to /admin/giftcerts
   await page.waitForURL('**/admin/giftcerts');
   await expect(page.locator('.discount-create')).toBeVisible();
 });
+
+// ─────────────────────────────────────────────────────────────────
+// Analytics tracker (P1-13) — public side fires page_view on mount
+// ─────────────────────────────────────────────────────────────────
+
+test('public homepage fires a page_view event on load', async ({ page }) => {
+  // Catch the analytics request as it leaves the page.
+  const eventReq = page.waitForRequest(
+    (req) => req.url().includes('/api/events') && req.method() === 'POST',
+    { timeout: 10000 },
+  );
+  await page.goto('/');
+  const req = await eventReq;
+  const body = req.postDataJSON() as { event: string; session_id: string; path: string };
+  expect(body.event).toBe('page_view');
+  expect(body.session_id.length).toBeGreaterThan(0);
+  expect(body.path).toBe('/');
+});
+
+test('navigating to an item fires item_view', async ({ page }) => {
+  await page.goto('/');
+  // Wait for the grid, then click the first product link into a detail page.
+  await page.waitForSelector('a[href^="/item/"]');
+  const firstHref = await page.locator('a[href^="/item/"]').first().getAttribute('href');
+  expect(firstHref).toBeTruthy();
+  const eventReq = page.waitForRequest(
+    (req) => {
+      if (!req.url().includes('/api/events') || req.method() !== 'POST') return false;
+      try {
+        const body = JSON.parse(req.postData() ?? '{}');
+        return body.event === 'item_view';
+      } catch {
+        return false;
+      }
+    },
+    { timeout: 10000 },
+  );
+  await page.goto(firstHref!);
+  const req = await eventReq;
+  const body = req.postDataJSON() as { event: string; item_id: string };
+  expect(body.event).toBe('item_view');
+  expect(body.item_id).toBeTruthy();
+});

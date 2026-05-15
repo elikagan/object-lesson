@@ -1,5 +1,6 @@
 import Script from 'next/script';
 import '../site.css';
+import { AnalyticsTracker } from '@/components/AnalyticsTracker';
 
 /**
  * Public-site layout. site.css is scoped to this segment so it doesn't bleed
@@ -9,6 +10,7 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
   return (
     <>
       {children}
+      <AnalyticsTracker />
 
       {/* Meta Pixel — public site only */}
       <Script id="meta-pixel" strategy="afterInteractive">

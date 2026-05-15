@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { Item } from '@/lib/types';
 import { imgUrl, formatId, isItemNew } from '@/lib/items';
 import { createClient } from '@/lib/supabase/client';
+import { trackEvent } from '@/lib/analytics';
 
 const PHONE = '3104985138';
 const EMAIL = 'eli@objectlesson.la';
@@ -39,6 +40,13 @@ export function ItemDetail({ item, justPurchased }: { item: Item; justPurchased:
   // Touch swipe state
   const trackRef = useRef<HTMLDivElement>(null);
   const carouselRef = useRef<HTMLDivElement>(null);
+
+  // Fire `item_view` once per item mount. The dependency on `item.id`
+  // makes it refire if the user navigates between detail pages (Next.js
+  // can re-use the component across route changes).
+  useEffect(() => {
+    trackEvent('item_view', item.id);
+  }, [item.id]);
 
   // Hide scroll hint after first scroll
   useEffect(() => {
@@ -178,6 +186,7 @@ export function ItemDetail({ item, justPurchased }: { item: Item; justPurchased:
         return;
       }
       setDiscount({ code: d.code, type: d.type, value: Number(d.value) });
+      trackEvent('discount_applied', item.id);
     } finally {
       setDiscountSubmitting(false);
     }
@@ -190,6 +199,7 @@ export function ItemDetail({ item, justPurchased }: { item: Item; justPurchased:
 
   async function proceedToCheckout() {
     setBuying(true);
+    trackEvent('buy_now', item.id);
     try {
       const body: Record<string, unknown> = {
         title: item.title,
@@ -373,7 +383,11 @@ export function ItemDetail({ item, justPurchased }: { item: Item; justPurchased:
                 </button>
               )}
               {!showSold && (
-                <a className="detail-inquire" href={inquireHref}>
+                <a
+                  className="detail-inquire"
+                  href={inquireHref}
+                  onClick={() => trackEvent('inquire', item.id)}
+                >
                   Inquire
                 </a>
               )}
