@@ -2,6 +2,24 @@
 
 import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import {
+  DndContext,
+  PointerSensor,
+  TouchSensor,
+  KeyboardSensor,
+  useSensor,
+  useSensors,
+  closestCenter,
+  type DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  rectSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import type { Item, Category, Condition } from '@/lib/types';
 import { thumbUrl } from '@/lib/items';
 import {
@@ -376,6 +394,28 @@ export function ItemEditor({
     });
   }
 
+  // ─── Drag-to-reorder photos (P1-16) ───────────────────────────
+  // Long-press a photo (200ms / 5px tolerance on touch, or just start
+  // dragging on mouse with 8px activation) → drag to new position →
+  // photos array order updates → first photo is the new hero. Mirrors
+  // v1 admin/app.js:845-857.
+  const photoSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+
+  function onPhotoDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    setPhotos((arr) => {
+      const oldIdx = arr.findIndex((p) => photoKey(p) === active.id);
+      const newIdx = arr.findIndex((p) => photoKey(p) === over.id);
+      if (oldIdx < 0 || newIdx < 0) return arr;
+      return arrayMove(arr, oldIdx, newIdx);
+    });
+  }
+
   async function uploadPending(itemId: string): Promise<string[]> {
     const pending = photos.filter((p): p is { pendingFile: File; preview: string } => 'pendingFile' in p);
     if (pending.length === 0) return [];
@@ -571,49 +611,28 @@ export function ItemEditor({
         )}
         <section className="editor-section">
           <p className="section-label">Photos</p>
-          <div className="photo-grid">
-            {photos.map((p, i) => {
-              const src = 'remotePath' in p ? thumbUrl(p.remotePath) : p.preview;
-              const isPending = 'pendingFile' in p;
-              const alreadyProcessed = isPending && !!p.processed;
-              // Default aiProcess to true (mirrors v1: new uploads are
-              // AI-included unless the admin toggles them off). Only show
-              // the toggle on un-processed pending photos — once a photo
-              // has been through AI you can't re-include it via this UI.
-              const aiOn = isPending ? p.aiProcess !== false : false;
-              return (
-                <div key={i} className="photo-cell">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={src} alt="" />
-                  {i === 0 && (
-                    <span className="photo-hero-dot" aria-label="Hero image" />
-                  )}
-                  <button
-                    type="button"
-                    className="photo-remove"
-                    aria-label="Remove"
-                    onClick={() => removePhoto(i)}
-                  >
-                    ×
-                  </button>
-                  {isPending && !alreadyProcessed && (
-                    <button
-                      type="button"
-                      className={`photo-ai${aiOn ? ' active' : ''}`}
-                      aria-label={aiOn ? 'Exempt from AI processing' : 'Include in AI processing'}
-                      aria-pressed={aiOn}
-                      title={aiOn ? 'AI processing on — click to exempt this photo' : 'AI processing off — click to include this photo'}
-                      onClick={() => toggleAiOnPhoto(i)}
-                    >
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 16.8l-6.2 4.5 2.4-7.4L2 9.4h7.6z" />
-                      </svg>
-                    </button>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+          <DndContext
+            sensors={photoSensors}
+            collisionDetection={closestCenter}
+            onDragEnd={onPhotoDragEnd}
+          >
+            <SortableContext
+              items={photos.map((p) => photoKey(p))}
+              strategy={rectSortingStrategy}
+            >
+              <div className="photo-grid">
+                {photos.map((p, i) => (
+                  <SortablePhotoCell
+                    key={photoKey(p)}
+                    photo={p}
+                    index={i}
+                    onRemove={removePhoto}
+                    onToggleAi={toggleAiOnPhoto}
+                  />
+                ))}
+              </div>
+            </SortableContext>
+          </DndContext>
           {/*
             v1 used <label> with the input as a child, no JS click handler — the
             browser triggers the input natively when the label is clicked.
@@ -789,6 +808,103 @@ export function ItemEditor({
           </button>
         </section>
       </div>
+    </div>
+  );
+}
+
+/**
+ * Stable identifier for a photo across renders. Remote photos use the
+ * storage path; pending photos use the blob preview URL (unique per
+ * createObjectURL call). When AI processing replaces a pending file's
+ * bytes, it generates a fresh preview URL — that's fine, dnd-kit just
+ * sees it as a new id, which is correct since the photo IS a new file.
+ */
+function photoKey(p: Photo): string {
+  return 'remotePath' in p ? `r:${p.remotePath}` : `p:${p.preview}`;
+}
+
+/**
+ * One photo cell, sortable. Long-press anywhere on the photo (200ms on
+ * touch) starts the drag. Buttons inside the cell (Remove, AI toggle)
+ * stop event propagation on click so they don't accidentally trigger a
+ * drag.
+ */
+function SortablePhotoCell({
+  photo,
+  index,
+  onRemove,
+  onToggleAi,
+}: {
+  photo: Photo;
+  index: number;
+  onRemove: (idx: number) => void;
+  onToggleAi: (idx: number) => void;
+}) {
+  const {
+    setNodeRef,
+    attributes,
+    listeners,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: photoKey(photo) });
+  const src = 'remotePath' in photo ? thumbUrl(photo.remotePath) : photo.preview;
+  const isPending = 'pendingFile' in photo;
+  const alreadyProcessed = isPending && !!photo.processed;
+  const aiOn = isPending ? photo.aiProcess !== false : false;
+
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.4 : undefined,
+    zIndex: isDragging ? 5 : undefined,
+    touchAction: 'none',
+    cursor: 'grab',
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      className="photo-cell"
+      style={style}
+      {...attributes}
+      {...listeners}
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={src} alt="" draggable={false} />
+      {index === 0 && <span className="photo-hero-dot" aria-label="Hero image" />}
+      <button
+        type="button"
+        className="photo-remove"
+        aria-label="Remove"
+        // PointerDown stop-propagation prevents dnd-kit from starting a
+        // drag when the admin taps the remove button. Click still fires.
+        onPointerDown={(e) => e.stopPropagation()}
+        onClick={(e) => {
+          e.stopPropagation();
+          onRemove(index);
+        }}
+      >
+        ×
+      </button>
+      {isPending && !alreadyProcessed && (
+        <button
+          type="button"
+          className={`photo-ai${aiOn ? ' active' : ''}`}
+          aria-label={aiOn ? 'Exempt from AI processing' : 'Include in AI processing'}
+          aria-pressed={aiOn}
+          title={aiOn ? 'AI processing on — click to exempt this photo' : 'AI processing off — click to include this photo'}
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleAi(index);
+          }}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 16.8l-6.2 4.5 2.4-7.4L2 9.4h7.6z" />
+          </svg>
+        </button>
+      )}
     </div>
   );
 }
