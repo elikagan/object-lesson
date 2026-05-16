@@ -377,7 +377,7 @@ Order of work: P0 → P1 → P2. Within a tier, top to bottom. Don't skip.
 - [x] **P1-15 · Per-photo reprocess menu — not built.** §2.5. v1 had three options per processed photo: Better lighting / Better background / Better shadow. Each maps to a Gemini prompt in `lib/admin/gemini.ts` (port from v1 `admin/app.js:962-1022`).
 - [x] **P1-16 · Drag-to-reorder photos in editor — not built.** §2.5. v1 used Sortable.js with 150ms touch delay. Reorder must update both the `images` array order and which photo is `hero_image` (first one).
 - [x] **P1-17 · Admin Marketing view — not built.** §2.11. Email subscribers table + count + CSV export, plus discount codes list with create/toggle-active. Filters out gift certs (those live in P0-4).
-- [ ] **P1-18 · Privacy page (`/privacy`) — not ported.** §1.8. Static page; v1 source is `privacy/index.html` (96 lines). Required disclosure for Meta Pixel / GDPR.
+- [x] **P1-18 · Privacy page (`/privacy`) — not ported.** §1.8. Static page; v1 source is `privacy/index.html` (96 lines). Required disclosure for Meta Pixel / GDPR.
 - [ ] **P1-19 · `/send-gift-email` endpoint — not ported.** §3.1. Needed by P0-4 (admin Gift Cert create with optional auto-send). Mirrors v1 worker `handleSendGiftEmail` — Resend API call with the gift-cert HTML template.
 - [ ] **P1-20 · PIN rate limiting.** §2.1. v1: 5 attempts → 5-minute lockout. Verify v2 enforces this (or build it).
 - [ ] **P1-21 · Reconcile sales on admin load.** §2.3. v1 admin called `/sales` on load and auto-marked any item sold whose Square sale row exists but `is_sold` is still false. Catches webhook misses. Verify or port.
