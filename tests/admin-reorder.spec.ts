@@ -26,15 +26,25 @@ async function login(page: import('@playwright/test').Page) {
  *       and that's what we test.
  */
 
-test('every active item row has a drag handle', async ({ page }) => {
+test('every active item row is itself draggable (long-press anywhere on the row)', async ({ page }) => {
   await login(page);
   await page.waitForSelector('.item-row');
   const activeRows = page.locator('.item-list > .swipe-wrap > .item-row');
   const count = await activeRows.count();
   expect(count).toBeGreaterThan(0);
-  // Every active row contains a .item-drag element (the handle).
+  // dnd-kit's useSortable attaches role="button" + aria-roledescription
+  // ("sortable") + the dnd-kit data attribute to the element receiving
+  // the drag listeners. Earlier versions of this test asserted a
+  // dedicated .item-drag handle existed on each row — the handle was
+  // removed when the listeners moved to the whole row (Eli couldn't
+  // find a tiny dots icon on his phone).
   for (let i = 0; i < count; i++) {
-    await expect(activeRows.nth(i).locator('.item-drag')).toBeVisible();
+    const row = activeRows.nth(i);
+    // touch-action: pan-y is what lets the long-press timer run while
+    // still allowing scroll. Without it, the dnd-kit drag never fires
+    // on touch devices.
+    const touchAction = await row.evaluate((el) => getComputedStyle(el).touchAction);
+    expect(touchAction).toContain('pan-y');
   }
 });
 
