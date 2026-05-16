@@ -68,3 +68,14 @@ test('footer links to /privacy from every public page', async ({ page }) => {
   await page.goto('/');
   await expect(page.locator('footer a[href="/privacy"]')).toBeVisible();
 });
+
+test('public pages send a Content-Security-Policy header (P2-29)', async ({ request }) => {
+  const res = await request.get('http://localhost:3000/');
+  const csp = res.headers()['content-security-policy'];
+  expect(csp).toBeTruthy();
+  // Just a sanity check that the policy includes the basics. Don't pin
+  // the exact string — directives may need to expand for future
+  // third-party scripts.
+  expect(csp).toContain('default-src');
+  expect(csp).toContain('frame-ancestors');
+});
