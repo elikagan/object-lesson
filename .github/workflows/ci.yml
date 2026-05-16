@@ -43,6 +43,11 @@ jobs:
           ADMIN_PIN: ${{ secrets.ADMIN_PIN }}
           ADMIN_SESSION_SECRET: ${{ secrets.ADMIN_SESSION_SECRET }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          # Passing the webhook signing key un-skips the bad-signature
+          # rejection test in tests/api.spec.ts. Without it, that test
+          # auto-skips because verifySquareWebhook() returns true (dev
+          # escape hatch) when no key is configured.
+          SQUARE_WEBHOOK_SIGNATURE_KEY: ${{ secrets.SQUARE_WEBHOOK_SIGNATURE_KEY }}
 
       - name: Upload Playwright report on failure
         if: failure()
