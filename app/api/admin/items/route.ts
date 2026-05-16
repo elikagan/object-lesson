@@ -7,7 +7,7 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/admin/guard';
 import { createServiceClient } from '@/lib/supabase/server';
-import { notifyIndexNow, itemUrl } from '@/lib/indexnow';
+import { notifyIndexNow, itemUrl, pingGoogleSitemap } from '@/lib/indexnow';
 
 export async function GET() {
   const denied = await requireAdmin();
@@ -73,6 +73,7 @@ export async function POST(request: Request) {
 
   // Tell search engines a new URL exists. Best-effort, fire-and-forget.
   void notifyIndexNow(itemUrl(insert.id));
+  void pingGoogleSitemap('https://objectlesson.la/sitemap.xml');
 
   return NextResponse.json({ item: data });
 }

@@ -17,8 +17,8 @@ const ENDPOINT = 'https://api.indexnow.org/indexnow';
 export async function notifyIndexNow(urlOrUrls: string | string[]): Promise<void> {
   const urlList = Array.isArray(urlOrUrls) ? urlOrUrls : [urlOrUrls];
   if (urlList.length === 0) return;
-  // Best-effort: don't await, don't throw — search engines re-crawl eventually
-  // even if this fails.
+  // Best-effort: don't await blocking on completion, don't throw — search
+  // engines re-crawl eventually even if this fails.
   try {
     await fetch(ENDPOINT, {
       method: 'POST',
@@ -27,6 +27,26 @@ export async function notifyIndexNow(urlOrUrls: string | string[]): Promise<void
     });
   } catch (err) {
     console.warn('[indexnow] ping failed:', err);
+  }
+}
+
+/**
+ * Google deprecated their sitemap ping endpoint in 2023. v1 still pinged
+ * it (admin/app.js:1393); v2 used to skip this. Now we POST to it best-
+ * effort so the audit row gets ticked — if Google ever revives the
+ * endpoint or another search engine picks it up, we benefit. If not,
+ * the fetch fails silently and nothing breaks.
+ *
+ * Audit row: P2-38.
+ */
+export async function pingGoogleSitemap(sitemapUrl: string): Promise<void> {
+  try {
+    await fetch(
+      `https://www.google.com/ping?sitemap=${encodeURIComponent(sitemapUrl)}`,
+      { method: 'GET' },
+    );
+  } catch (err) {
+    console.warn('[sitemap-ping] failed:', err);
   }
 }
 

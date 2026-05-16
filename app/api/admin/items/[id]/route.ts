@@ -7,7 +7,7 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/admin/guard';
 import { createServiceClient } from '@/lib/supabase/server';
-import { notifyIndexNow, itemUrl } from '@/lib/indexnow';
+import { notifyIndexNow, itemUrl, pingGoogleSitemap } from '@/lib/indexnow';
 
 const UPDATABLE_FIELDS = new Set([
   'title',
@@ -77,6 +77,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
   // Tell search engines this URL changed. Best-effort, fire-and-forget.
   void notifyIndexNow(itemUrl(id));
+  void pingGoogleSitemap('https://objectlesson.la/sitemap.xml');
 
   return NextResponse.json({ item: data });
 }

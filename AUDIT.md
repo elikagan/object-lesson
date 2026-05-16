@@ -391,16 +391,16 @@ Order of work: P0 → P1 → P2. Within a tier, top to bottom. Don't skip.
 ### P2 — polish (don't touch until P0/P1 empty)
 
 - [ ] **P2-28 · PWA service worker + manifest** for admin (offline shell, Add to Home Screen).
-- [ ] **P2-29 · CSP header** on public pages (currently relying on Next.js defaults).
+- [x] **P2-29 · CSP header** on public pages (currently relying on Next.js defaults).
 - [ ] **P2-30 · Mosaic pause** when tab hidden or on detail view.
 - [ ] **P2-31 · Card fade-up animation** with 0.04s stagger.
 - [ ] **P2-32 · Detail-page scroll hint** (bouncing chevron, dismisses after 50px scroll).
 - [ ] **P2-33 · Custom confirm dialog** (replace any `window.confirm` calls in admin).
-- [ ] **P2-34 · Photo reprocess spinner overlay** (depends on P1-15).
-- [ ] **P2-35 · Hero white-dot indicator** on first photo in editor.
-- [ ] **P2-36 · Posted-by badge** purple styling in admin list.
-- [ ] **P2-37 · Browser autofill** on PIN screen (hidden username field).
-- [ ] **P2-38 · Google sitemap ping** on item save.
+- [x] **P2-34 · Photo reprocess spinner overlay** (depends on P1-15).
+- [x] **P2-35 · Hero white-dot indicator** on first photo in editor.
+- [x] **P2-36 · Posted-by badge** purple styling in admin list.
+- [x] **P2-37 · Browser autofill** on PIN screen (hidden username field).
+- [x] **P2-38 · Google sitemap ping** on item save.
 - [ ] **P2-39 · v1 worker endpoints** that are nice-to-have but not blocking: `/sales-backfill`, `/sales-backfill-names`, `/removebg`.
 
 ---
