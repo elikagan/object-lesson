@@ -383,7 +383,7 @@ Order of work: P0 → P1 → P2. Within a tier, top to bottom. Don't skip.
 - [x] **P1-21 · Reconcile sales on admin load.** §2.3. v1 admin called `/sales` on load and auto-marked any item sold whose Square sale row exists but `is_sold` is still false. Catches webhook misses. Verify or port.
 - [x] **P1-22 · Inquire link format on mobile.** §1.3. Mobile: `sms:3104985138&body=...`; desktop: `mailto:eli@objectlesson.la?subject=Inquiry: {title}&body=...`. Verify both formats and the body text.
 - [x] **P1-23 · Post-purchase thank-you with SMS link.** §1.3. Returning from `?purchased=1#{id}` shows thank-you card with pickup info and an SMS link prefilled with the purchased item's title.
-- [ ] **P1-24 · Image CDN with long TTL.** §3.1. v1 served images via `/img/*` with `Cache-Control: public, max-age=31536000, immutable` at the Cloudflare edge. Verify v2 (Supabase Storage) gets equivalent caching, or proxy.
+- [x] **P1-24 · Image CDN with long TTL.** §3.1. v1 served images via `/img/*` with `Cache-Control: public, max-age=31536000, immutable` at the Cloudflare edge. Verify v2 (Supabase Storage) gets equivalent caching, or proxy.
 - [x] **P1-25 · Site banner ("We're adding more of our collection every day").** §1.1. Dismissable, persists dismissal in localStorage. Verify it renders and dismiss sticks across reloads.
 - [x] **P1-26 · Card sold-pushed-to-end ordering on `all`.** §1.2. v1: in `all` view, sold items show at end at 45% opacity. Other categories exclude sold entirely. Verify the sort order matches.
 - [x] **P1-27 · `New` badge auto-expires after 7 days.** §1.2. Already in `lib/items.ts` per audit, but verify it works on a real fresh item and on a stale one.

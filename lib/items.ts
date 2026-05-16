@@ -3,18 +3,46 @@
  *
  * Image storage: items reference image paths like "images/products/000079/foo.jpg".
  * Those paths live in the Supabase Storage `product-images` bucket.
- * `imgUrl()` and `thumbUrl()` produce the public URL the browser can load.
+ *
+ * `imgUrl()` returns a same-origin `/img/<path>` URL. Vercel rewrites
+ * that to the Supabase Storage URL server-side (see next.config.ts) and
+ * adds a 1-year immutable Cache-Control header on the response — the
+ * long-TTL edge cache that v1 had via its Cloudflare Worker `/img/*`
+ * proxy. Supabase Storage itself sends `cache-control: no-cache`
+ * regardless of upload options, which is why we don't link directly.
  */
 import type { Item, Category } from './types';
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const STORAGE_BASE = `${SUPABASE_URL}/storage/v1/object/public/product-images`;
-
-/** Full-resolution image URL. */
+/**
+ * Full-resolution image URL, routed through Vercel's edge cache.
+ * Caller passes the storage path (e.g. "images/products/000079/foo.jpg")
+ * and we return "/img/images/products/000079/foo.jpg". The rewrite in
+ * next.config.ts maps that to the Supabase Storage public URL.
+ *
+ * Use this for `<img>` tags rendered in the browser. For Open Graph or
+ * JSON-LD metadata, where Google / Meta need an absolute URL to crawl,
+ * use `absoluteImgUrl()` instead.
+ */
 export function imgUrl(path: string | null | undefined): string {
   if (!path) return '';
+  // External absolute URLs pass through unchanged.
   if (path.startsWith('http')) return path;
-  return `${STORAGE_BASE}/${path}`;
+  const clean = path.replace(/^\/+/, '');
+  return `/img/${clean}`;
+}
+
+const SITE_ORIGIN = 'https://objectlesson.la';
+
+/**
+ * Same as imgUrl() but returns a fully-qualified absolute URL on the
+ * production origin. Required by Open Graph + JSON-LD which are crawled
+ * from a different origin than the page they're declared on.
+ */
+export function absoluteImgUrl(path: string | null | undefined): string {
+  if (!path) return '';
+  if (path.startsWith('http')) return path;
+  const clean = path.replace(/^\/+/, '');
+  return `${SITE_ORIGIN}/img/${clean}`;
 }
 
 /** 400px thumbnail URL — converts `foo.jpg` → `thumb_foo.jpg`. */
