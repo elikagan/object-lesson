@@ -130,6 +130,12 @@ export function ItemEditor({
   // small <p> at the bottom of the form. Errors now also surface in a fixed
   // banner above the photo grid that stays until the admin dismisses it.
   const [saveError, setSaveError] = useState('');
+  // Tracks whether the row was already POSTed in a prior save attempt. If
+  // the first save succeeded at create but failed at upload, the second
+  // click must SKIP the create POST (otherwise it 500s on duplicate id) and
+  // jump straight to upload + PATCH. Once true for this editor session,
+  // stays true.
+  const [rowCreated, setRowCreated] = useState(mode === 'edit');
   const photoInputRef = useRef<HTMLInputElement>(null);
 
   function onAddPhotos(e: React.ChangeEvent<HTMLInputElement>) {
@@ -192,6 +198,15 @@ export function ItemEditor({
         }),
       );
 
+      // Track the CURRENT title across AI steps. Step 1's price-tag OCR can
+      // fill the title; Step 4's geminiSuggest can also fill it. The
+      // function-level `title` (closure) doesn't reflect setTitle() calls
+      // made inside this same async function — so without a local mirror,
+      // step 4 always thinks the title is still empty and overwrites
+      // whatever step 1 set. Match all the user-typed-vs-AI guards against
+      // this local instead.
+      let currentTitle = title;
+
       // ── Step 1: price tag detection + OCR ─────────────────────
       const unprocessedFor1 = working
         .map((w, i) => (w.kind === 'pending' && !w.processed ? i : -1))
@@ -213,7 +228,11 @@ export function ItemEditor({
             const ocr = await geminiOCR(tagPhoto.dataUrl);
             if (ocr.price && !price) setPrice(String(ocr.price));
             if (ocr.dealerCode && !dealerCode) setDealerCode(ocr.dealerCode);
-            if (ocr.itemName && !title) setTitle(toTitleCase(ocr.itemName));
+            if (ocr.itemName && !currentTitle) {
+              const titled = toTitleCase(ocr.itemName);
+              setTitle(titled);
+              currentTitle = titled;
+            }
             // Remove the tag photo
             URL.revokeObjectURL(tagPhoto.preview);
             working = working.filter((_, i) => i !== tagPhotoIdx);
@@ -277,7 +296,15 @@ export function ItemEditor({
       if (remainingDataUrls.length > 0) {
         setStatus('Analyzing item…');
         const sugg = await geminiSuggest(remainingDataUrls);
-        if (sugg.title && !title) setTitle(sugg.title);
+        // Read against currentTitle (set by Step 1 if the price-tag OCR
+        // pulled a title from the tag). Closure's `title` is stale here
+        // because earlier setTitle() calls don't flush into the same
+        // execution context — without this guard, Step 4 always overwrites
+        // the OCR title with the generic AI suggestion.
+        if (sugg.title && !currentTitle) {
+          setTitle(sugg.title);
+          currentTitle = sugg.title;
+        }
         if (sugg.description && !description) setDescription(sugg.description);
         if (sugg.maker && !maker) setMaker(sugg.maker);
         // Condition has a DB CHECK constraint; AI freely returns prose like
@@ -385,8 +412,11 @@ export function ItemEditor({
 
       const itemId = mode === 'create' ? initialId : item!.id;
 
-      if (mode === 'create') {
-        // Create row first (no images yet)
+      if (mode === 'create' && !rowCreated) {
+        // Create row first (no images yet). The `rowCreated` guard makes
+        // this idempotent — if a previous attempt got past create but
+        // failed at upload, the retry skips this step. The subsequent
+        // upload + PATCH below are themselves idempotent (upsert + PATCH).
         const createRes = await fetch('/api/admin/items', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -410,6 +440,7 @@ export function ItemEditor({
           const d = await createRes.json().catch(() => ({}));
           throw new Error(d.error ?? 'Create failed');
         }
+        setRowCreated(true);
       }
 
       // Upload any pending files
