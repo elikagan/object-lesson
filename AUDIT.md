@@ -401,7 +401,11 @@ Order of work: P0 → P1 → P2. Within a tier, top to bottom. Don't skip.
 - [x] **P2-36 · Posted-by badge** purple styling in admin list.
 - [x] **P2-37 · Browser autofill** on PIN screen (hidden username field).
 - [x] **P2-38 · Google sitemap ping** on item save.
-- [ ] **P2-39 · v1 worker endpoints** that are nice-to-have but not blocking: `/sales-backfill`, `/sales-backfill-names`, `/removebg`.
+- [x] **P2-39 · v1 worker endpoints — decided not to port (parked with rationale).**
+  - `/removebg` — v1 proxied to the remove.bg paid API. v2 does background removal locally via Gemini (`gemini-2.5-flash-image` in admin AI processing). Re-adding remove.bg would re-introduce a paid third-party dependency with no functional gain.
+  - `/sales-backfill`, `/sales-backfill-names` — one-time maintenance tools that scraped Square's transaction history to retroactively fill v1's sales JSON. v2 starts the sales table fresh and the live `/api/webhook/square` handler writes new rows on every sale, so there's no backfill to run. Historical v1 sales remain in v1's record and aren't needed in v2.
+
+  If a future need arises (e.g. importing the v1 sales archive for analytics), the v1 worker code at `Object Lesson App and Website/worker/square-checkout.js` (lines 616–920) is a clean reference.
 
 ---
 
