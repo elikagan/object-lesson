@@ -2,21 +2,46 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Sortable from 'sortablejs';
+import {
+  DndContext,
+  PointerSensor,
+  TouchSensor,
+  KeyboardSensor,
+  useSensor,
+  useSensors,
+  closestCenter,
+  type DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import type { Item } from '@/lib/types';
 import { thumbUrl, heroOf, formatId, isItemNew } from '@/lib/items';
 
 /**
- * Admin list view — matches v1 admin/index.html lines 47-85 + app.js renderList()
- * verbatim. Wired to v2 API routes.
+ * Admin list view — matches v1 admin/index.html lines 47-85 + app.js renderList().
  *
- * Behavior parity with v1:
- *   - Topbar: logo center, version label + hamburger menu right
- *   - Item list: drag handle, swipe-to-delete, click anywhere else to edit
- *   - Archive section (sold items) collapsible
- *   - FAB "+" button bottom right
- *   - Hamburger menu items: Analytics, Sales, Gift Certificates, Marketing, Settings
- *     (those screens still link to v1 admin until ported in a follow-up)
+ * Drag-to-reorder uses @dnd-kit (instead of Sortable.js) because Sortable.js
+ * doesn't play well with React + iOS Safari touch — its imperative DOM
+ * mutation fights React's re-renders, and the HTML5 drag fallback it relies
+ * on is flaky-to-absent on iPhone. dnd-kit is React-first, pointer-event-
+ * based, and works the same on mouse and touch.
+ *
+ * Touch contract:
+ *   - Long-press (200ms) on the drag handle activates the drag.
+ *   - Below that, the row's onTouchStart still drives the swipe-to-delete
+ *     handler (mutually exclusive — the drag handle's listeners stop
+ *     propagation once activated).
+ *   - Vertical drag past 5px during the press cancels (so a swipe-to-scroll
+ *     never gets eaten by an accidental drag).
+ *
+ * Archive (sold) items are NOT sortable — they live outside the
+ * SortableContext, matching v1.
  */
 export function AdminListView({ items: initialItems, version }: { items: Item[]; version: string }) {
   const router = useRouter();
@@ -24,69 +49,79 @@ export function AdminListView({ items: initialItems, version }: { items: Item[];
   const [menuOpen, setMenuOpen] = useState(false);
   const [archiveCollapsed, setArchiveCollapsed] = useState(true);
   const [openSwipeId, setOpenSwipeId] = useState<string | null>(null);
-  const listRef = useRef<HTMLDivElement>(null);
-  const sortableRef = useRef<Sortable | null>(null);
   const swipeStartRef = useRef<{ id: string; x: number; y: number; locked: boolean | null } | null>(null);
 
-  // Set up Sortable for drag-reorder of active items
-  useEffect(() => {
-    const el = listRef.current;
-    if (!el) return;
-    async function saveOrder(orderedActiveIds: string[]) {
-      // Each item gets its own PATCH (single-row update — the architectural fix).
-      const updates = orderedActiveIds.map((id, idx) =>
-        fetch(`/api/admin/items/${id}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ display_order: idx }),
-        }),
-      );
-      await Promise.all(updates);
-      router.refresh();
-    }
-    const instance = Sortable.create(el, {
-      handle: '.item-drag',
-      ghostClass: 'sortable-ghost',
-      animation: 200,
-      filter: '.archive-header, .archive-items',
-      // Touch: require a 150ms press before drag activates. Without this,
-      // tapping the handle on a phone is ambiguous with the row's swipe-
-      // to-delete touch handler and the OS's pull-to-refresh. Mirrors the
-      // v1 photo-grid Sortable config (admin/app.js:848-849).
-      delay: 150,
-      delayOnTouchOnly: true,
-      // forceFallback makes Sortable use its own JS-based drag instead of
-      // the browser's HTML5 drag-and-drop API. Critical on touchscreens
-      // where HTML5 drag is flaky-to-absent on iOS Safari, and lets us
-      // render a visible "ghost" clone of the row while dragging.
-      forceFallback: true,
-      // Allow up to 5px of finger jitter during the 150ms delay before
-      // we cancel the drag — fingers wiggle.
-      touchStartThreshold: 5,
-      fallbackTolerance: 5,
-      onMove(evt) {
-        return (
-          !evt.related.classList.contains('archive-header') &&
-          !evt.related.classList.contains('archive-items')
-        );
-      },
-      onEnd: () => {
-        const rows = el.querySelectorAll<HTMLElement>(':scope > .swipe-wrap > .item-row');
-        const newIds = Array.from(rows).map((r) => r.dataset.id!).filter(Boolean);
-        void saveOrder(newIds);
-      },
-    });
-    sortableRef.current = instance;
-    return () => {
-      try {
-        instance.destroy();
-      } catch {
-        // Sortable can throw if the DOM element was already unmounted by React
-        // StrictMode's double-invocation; safe to ignore.
+  // Sync local state if the parent re-renders us with new data (e.g. after
+  // router.refresh() following a save). Canonical React "adjusting state
+  // during render" pattern: track the previous prop in state, and when the
+  // current prop reference differs, reset both. setState during render is
+  // explicitly endorsed by the React docs for this exact case.
+  const [lastInitial, setLastInitial] = useState(initialItems);
+  if (initialItems !== lastInitial) {
+    setLastInitial(initialItems);
+    setItems(initialItems);
+  }
+
+  // Sensors: pointer for mouse, touch for fingers, keyboard for a11y.
+  // The activationConstraint is critical — without it, every tap/touch
+  // would try to start a drag, eating swipe-to-delete and scroll.
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      // Mouse must move 8px before the click is treated as a drag (so clicks
+      // on the drag handle that don't move still let the row's onClick fire).
+      activationConstraint: { distance: 8 },
+    }),
+    useSensor(TouchSensor, {
+      // Long-press 200ms with ≤5px finger jitter activates the drag.
+      activationConstraint: { delay: 200, tolerance: 5 },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    }),
+  );
+
+  async function onDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    // Compute new active-items order optimistically. Sold items aren't in
+    // the SortableContext, so they don't participate — they trail the
+    // active list as the archive section.
+    const activeItems = items.filter((i) => !i.is_sold);
+    const oldIdx = activeItems.findIndex((i) => i.id === active.id);
+    const newIdx = activeItems.findIndex((i) => i.id === over.id);
+    if (oldIdx < 0 || newIdx < 0) return;
+
+    const newActive = arrayMove(activeItems, oldIdx, newIdx);
+    const sold = items.filter((i) => i.is_sold);
+    // Rebuild items with new display_order on the active set.
+    const reordered: Item[] = [
+      ...newActive.map((i, idx) => ({ ...i, display_order: idx })),
+      ...sold,
+    ];
+    setItems(reordered);
+
+    // Persist: one PATCH per moved item (the architectural fix — PATCH only
+    // updates the fields in the body). Fire them in parallel; on failure
+    // we'll log but not roll back the local optimistic state.
+    const updates = newActive.map((i, idx) =>
+      fetch(`/api/admin/items/${i.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ display_order: idx }),
+      }),
+    );
+    try {
+      const results = await Promise.all(updates);
+      if (results.some((r) => !r.ok)) {
+        console.warn('[reorder] one or more PATCH calls failed');
       }
-      if (sortableRef.current === instance) sortableRef.current = null;
-    };
-  }, [items, router]);
+    } catch (err) {
+      console.warn('[reorder] network error:', err);
+    }
+    // Re-sync from the server so any concurrent edits show up.
+    router.refresh();
+  }
 
   // Close menu on outside click
   useEffect(() => {
@@ -122,25 +157,22 @@ export function AdminListView({ items: initialItems, version }: { items: Item[];
     setItems((arr) => arr.filter((i) => i.id !== id));
   }
 
-  // Touch handlers for swipe-to-reveal-delete
+  // Touch handlers for swipe-to-reveal-delete on a row body.
   function onSwipeStart(e: React.TouchEvent<HTMLDivElement>, id: string) {
     const t = e.touches[0];
     swipeStartRef.current = { id, x: t.clientX, y: t.clientY, locked: null };
   }
-
   function onSwipeMove(e: React.TouchEvent<HTMLDivElement>, id: string) {
     const start = swipeStartRef.current;
     if (!start || start.id !== id) return;
     const t = e.touches[0];
     const dx = t.clientX - start.x;
     const dy = t.clientY - start.y;
-    // Lock direction on first significant move
     if (start.locked === null && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) {
       start.locked = Math.abs(dx) > Math.abs(dy);
       if (!start.locked) swipeStartRef.current = null;
     }
   }
-
   function onSwipeEnd(e: React.TouchEvent<HTMLDivElement>, id: string) {
     const start = swipeStartRef.current;
     swipeStartRef.current = null;
@@ -163,6 +195,7 @@ export function AdminListView({ items: initialItems, version }: { items: Item[];
 
   const active = items.filter((i) => !i.is_sold);
   const sold = items.filter((i) => i.is_sold);
+  const activeIds = active.map((i) => i.id);
 
   return (
     <div id="view-list" className="view">
@@ -219,23 +252,27 @@ export function AdminListView({ items: initialItems, version }: { items: Item[];
         </div>
       </header>
 
-      <div className="item-list" ref={listRef}>
+      <div className="item-list">
         {items.length === 0 ? (
           <div className="list-empty">No items yet. Tap + to add one.</div>
         ) : (
           <>
-            {active.map((item) => (
-              <ItemRow
-                key={item.id}
-                item={item}
-                openSwipeId={openSwipeId}
-                onSwipeStart={onSwipeStart}
-                onSwipeMove={onSwipeMove}
-                onSwipeEnd={onSwipeEnd}
-                onRowClick={onRowClick}
-                onDelete={deleteItem}
-              />
-            ))}
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+              <SortableContext items={activeIds} strategy={verticalListSortingStrategy}>
+                {active.map((item) => (
+                  <SortableItemRow
+                    key={item.id}
+                    item={item}
+                    openSwipeId={openSwipeId}
+                    onSwipeStart={onSwipeStart}
+                    onSwipeMove={onSwipeMove}
+                    onSwipeEnd={onSwipeEnd}
+                    onRowClick={onRowClick}
+                    onDelete={deleteItem}
+                  />
+                ))}
+              </SortableContext>
+            </DndContext>
             {sold.length > 0 && (
               <>
                 <div
@@ -259,6 +296,7 @@ export function AdminListView({ items: initialItems, version }: { items: Item[];
                       onSwipeEnd={onSwipeEnd}
                       onRowClick={onRowClick}
                       onDelete={deleteItem}
+                      sortable={null}
                     />
                   ))}
                 </div>
@@ -282,15 +320,11 @@ export function AdminListView({ items: initialItems, version }: { items: Item[];
   );
 }
 
-function ItemRow({
-  item,
-  openSwipeId,
-  onSwipeStart,
-  onSwipeMove,
-  onSwipeEnd,
-  onRowClick,
-  onDelete,
-}: {
+/**
+ * Wraps a single ItemRow with dnd-kit's useSortable hook. Active (non-sold)
+ * items use this; archive items render plain ItemRow with sortable=null.
+ */
+function SortableItemRow(props: {
   item: Item;
   openSwipeId: string | null;
   onSwipeStart: (e: React.TouchEvent<HTMLDivElement>, id: string) => void;
@@ -299,6 +333,31 @@ function ItemRow({
   onRowClick: (e: React.MouseEvent, id: string) => void;
   onDelete: (id: string) => void;
 }) {
+  const sortable = useSortable({ id: props.item.id });
+  return <ItemRow {...props} sortable={sortable} />;
+}
+
+type SortableHookReturn = ReturnType<typeof useSortable>;
+
+function ItemRow({
+  item,
+  openSwipeId,
+  onSwipeStart,
+  onSwipeMove,
+  onSwipeEnd,
+  onRowClick,
+  onDelete,
+  sortable,
+}: {
+  item: Item;
+  openSwipeId: string | null;
+  onSwipeStart: (e: React.TouchEvent<HTMLDivElement>, id: string) => void;
+  onSwipeMove: (e: React.TouchEvent<HTMLDivElement>, id: string) => void;
+  onSwipeEnd: (e: React.TouchEvent<HTMLDivElement>, id: string) => void;
+  onRowClick: (e: React.MouseEvent, id: string) => void;
+  onDelete: (id: string) => void;
+  sortable: SortableHookReturn | null;
+}) {
   const heroSrc = thumbUrl(heroOf(item));
   const isOpen = openSwipeId === item.id;
   let badge: React.ReactNode = null;
@@ -306,10 +365,24 @@ function ItemRow({
   else if (item.is_hold) badge = <span className="item-hold">Hold</span>;
   else if (isItemNew(item)) badge = <span className="item-new">New</span>;
 
+  // Drag transform from dnd-kit (applied to the outer swipe-wrap so the row
+  // and its swipe-behind move together).
+  const dragStyle: React.CSSProperties | undefined = sortable
+    ? {
+        transform: CSS.Transform.toString(sortable.transform),
+        transition: sortable.transition,
+        opacity: sortable.isDragging ? 0.4 : undefined,
+        zIndex: sortable.isDragging ? 5 : undefined,
+        position: 'relative',
+      }
+    : undefined;
+
   return (
     <div
       className="swipe-wrap"
       data-id={item.id}
+      ref={sortable?.setNodeRef}
+      style={dragStyle}
       onTouchStart={(e) => onSwipeStart(e, item.id)}
       onTouchMove={(e) => onSwipeMove(e, item.id)}
       onTouchEnd={(e) => onSwipeEnd(e, item.id)}
@@ -337,16 +410,21 @@ function ItemRow({
         style={{ transform: isOpen ? 'translateX(-72px)' : undefined }}
         onClick={(e) => onRowClick(e, item.id)}
       >
-        <div className="item-drag">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <circle cx="9" cy="6" r="1" />
-            <circle cx="15" cy="6" r="1" />
-            <circle cx="9" cy="12" r="1" />
-            <circle cx="15" cy="12" r="1" />
-            <circle cx="9" cy="18" r="1" />
-            <circle cx="15" cy="18" r="1" />
-          </svg>
-        </div>
+        {sortable ? (
+          <button
+            type="button"
+            className="item-drag"
+            aria-label="Drag to reorder"
+            {...sortable.attributes}
+            {...sortable.listeners}
+          >
+            <DragGripIcon />
+          </button>
+        ) : (
+          <div className="item-drag item-drag-disabled" aria-hidden="true">
+            <DragGripIcon />
+          </div>
+        )}
         <div className="item-thumb">
           {heroSrc && (
             // eslint-disable-next-line @next/next/no-img-element
@@ -364,6 +442,19 @@ function ItemRow({
         <span className="item-category">{item.category || ''}</span>
       </div>
     </div>
+  );
+}
+
+function DragGripIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <circle cx="9" cy="6" r="1" />
+      <circle cx="15" cy="6" r="1" />
+      <circle cx="9" cy="12" r="1" />
+      <circle cx="15" cy="12" r="1" />
+      <circle cx="9" cy="18" r="1" />
+      <circle cx="15" cy="18" r="1" />
+    </svg>
   );
 }
 

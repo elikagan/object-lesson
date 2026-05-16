@@ -202,13 +202,18 @@ select.field:has(option[value=""]:checked) { color: var(--light); }
 .item-row:active { background: var(--bg2); }
 
 .item-drag {
+  /* Reset native button look (was a <div> with Sortable.js; dnd-kit wants
+     the listeners on a focusable button for keyboard a11y). */
+  background: none;
+  border: none;
+  appearance: none;
+  -webkit-appearance: none;
+
   color: var(--light);
   cursor: grab;
   touch-action: none;
   flex-shrink: 0;
-  /* Bigger hit target than the visual icon — easier to land a finger on
-     a phone. The SVG itself stays 16x16; the padding extends the
-     clickable area to 44x44 (Apple HIG minimum). */
+  /* Hit target: 44x44 (Apple HIG minimum), centered around the 16x16 icon. */
   padding: 14px;
   margin: -14px;
   display: flex;
@@ -218,7 +223,13 @@ select.field:has(option[value=""]:checked) { color: var(--light); }
   min-height: 44px;
   box-sizing: border-box;
 }
-.item-drag:active { cursor: grabbing; }
+.item-drag:active,
+.item-drag:focus-visible { cursor: grabbing; outline: none; }
+.item-drag-disabled {
+  /* Sold items render a non-interactive copy. */
+  opacity: 0.4;
+  cursor: default;
+}
 
 .item-thumb {
   width: 52px;
