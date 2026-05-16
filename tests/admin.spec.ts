@@ -365,6 +365,60 @@ test('admin /sales renders summary cards + transaction list (matches v1 visuals)
   }
 });
 
+test('deleting an item from the list opens the custom confirm dialog (not window.confirm)', async ({ page, request }) => {
+  // Create a throwaway item to delete.
+  await login(page);
+  const cookies = await page.context().cookies();
+  const cookieHeader = cookies.map((c) => `${c.name}=${c.value}`).join('; ');
+
+  const id = `_test_dialog_${Date.now()}`;
+  await request.post('http://localhost:3000/api/admin/items', {
+    headers: { 'Content-Type': 'application/json', Cookie: cookieHeader },
+    data: {
+      id,
+      title: 'Dialog probe',
+      description: '',
+      price: 1,
+      size: '',
+      category: 'misc',
+      maker: '',
+      condition: '',
+      dealer_code: '',
+      posted_by: 'test',
+      is_new: false,
+      is_hold: false,
+      is_sold: false,
+      hero_image: null,
+      images: [],
+      display_order: 99998,
+    },
+  });
+
+  await page.goto('/admin/items');
+  await page.waitForSelector(`.swipe-wrap[data-id="${id}"]`);
+
+  try {
+    // The swipe-delete button is positioned behind the item-row in the DOM
+    // stacking order, so a normal click would hit the row. Dispatch the
+    // click event directly on the button to invoke its handler.
+    const row = page.locator(`.swipe-wrap[data-id="${id}"]`);
+    await row.locator('.swipe-delete').dispatchEvent('click');
+    // Custom .overlay dialog should appear — not a native browser confirm.
+    await expect(page.locator('.overlay')).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('.dialog')).toBeVisible();
+    await expect(page.getByText(/Delete Dialog probe/)).toBeVisible();
+    // Cancel returns false — item stays.
+    await page.locator('.dialog-cancel').click();
+    await expect(page.locator('.overlay')).toHaveCount(0);
+    // Item still in the list.
+    await expect(page.locator(`.swipe-wrap[data-id="${id}"]`)).toBeVisible();
+  } finally {
+    await request.delete(`http://localhost:3000/api/admin/items/${id}`, {
+      headers: { Cookie: cookieHeader },
+    });
+  }
+});
+
 test('admin list-view hamburger menu links Sales to /admin/sales (no longer dead)', async ({ page }) => {
   await login(page);
   // Open the hamburger.

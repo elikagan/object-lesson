@@ -22,6 +22,7 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import type { Item } from '@/lib/types';
 import { thumbUrl, heroOf, formatId, isItemNew } from '@/lib/items';
+import { useConfirmDialog } from './ConfirmDialog';
 
 /**
  * Admin list view — matches v1 admin/index.html lines 47-85 + app.js renderList().
@@ -50,6 +51,7 @@ export function AdminListView({ items: initialItems, version }: { items: Item[];
   const [archiveCollapsed, setArchiveCollapsed] = useState(true);
   const [openSwipeId, setOpenSwipeId] = useState<string | null>(null);
   const swipeStartRef = useRef<{ id: string; x: number; y: number; locked: boolean | null } | null>(null);
+  const { confirm: confirmAsync, dialog: confirmDialog } = useConfirmDialog();
 
   // Sync local state if the parent re-renders us with new data (e.g. after
   // router.refresh() following a save). Canonical React "adjusting state
@@ -148,7 +150,10 @@ export function AdminListView({ items: initialItems, version }: { items: Item[];
   async function deleteItem(id: string) {
     const item = items.find((i) => i.id === id);
     if (!item) return;
-    if (!confirm(`Delete ${item.title || 'this item'}?`)) return;
+    const ok = await confirmAsync(`Delete ${item.title || 'this item'}?`, {
+      confirmLabel: 'Delete',
+    });
+    if (!ok) return;
     const res = await fetch(`/api/admin/items/${id}`, { method: 'DELETE' });
     if (!res.ok) {
       alert('Delete failed');
@@ -319,6 +324,7 @@ export function AdminListView({ items: initialItems, version }: { items: Item[];
           <line x1="5" y1="12" x2="19" y2="12" />
         </svg>
       </button>
+      {confirmDialog}
     </div>
   );
 }

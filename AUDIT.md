@@ -392,10 +392,10 @@ Order of work: P0 → P1 → P2. Within a tier, top to bottom. Don't skip.
 
 - [ ] **P2-28 · PWA service worker + manifest** for admin (offline shell, Add to Home Screen).
 - [x] **P2-29 · CSP header** on public pages (currently relying on Next.js defaults).
-- [ ] **P2-30 · Mosaic pause** when tab hidden or on detail view.
-- [ ] **P2-31 · Card fade-up animation** with 0.04s stagger.
-- [ ] **P2-32 · Detail-page scroll hint** (bouncing chevron, dismisses after 50px scroll).
-- [ ] **P2-33 · Custom confirm dialog** (replace any `window.confirm` calls in admin).
+- [x] **P2-30 · Mosaic pause** when tab hidden or on detail view.
+- [x] **P2-31 · Card fade-up animation** with 0.04s stagger.
+- [x] **P2-32 · Detail-page scroll hint** (bouncing chevron, dismisses after 50px scroll).
+- [x] **P2-33 · Custom confirm dialog** (replace any `window.confirm` calls in admin).
 - [x] **P2-34 · Photo reprocess spinner overlay** (depends on P1-15).
 - [x] **P2-35 · Hero white-dot indicator** on first photo in editor.
 - [x] **P2-36 · Posted-by badge** purple styling in admin list.
