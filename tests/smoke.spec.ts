@@ -52,3 +52,19 @@ test('unknown item returns 404', async ({ page }) => {
   expect(response?.status()).toBe(404);
   await expect(page.getByText(/no longer available/)).toBeVisible();
 });
+
+test('/privacy page loads with all required disclosure sections', async ({ page }) => {
+  await page.goto('/privacy');
+  await expect(page.getByRole('heading', { level: 1, name: /Privacy Policy/ })).toBeVisible();
+  // Required Meta Pixel disclosure sections
+  await expect(page.getByText(/Information We Collect/)).toBeVisible();
+  await expect(page.getByText(/Third-Party Services/)).toBeVisible();
+  await expect(page.getByText(/Meta \(Facebook\/Instagram\)/)).toBeVisible();
+  // Back link
+  await expect(page.getByRole('link', { name: /Back to Object Lesson/ })).toBeVisible();
+});
+
+test('footer links to /privacy from every public page', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('footer a[href="/privacy"]')).toBeVisible();
+});

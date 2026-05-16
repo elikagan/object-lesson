@@ -12,6 +12,7 @@ export function SiteFooter() {
             </svg>
           </a>
           <a href="sms:3104985138">Contact</a>
+          <a href="/privacy">Privacy</a>
         </div>
       </div>
     </footer>
