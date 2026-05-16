@@ -49,6 +49,21 @@ export function AdminListView({ items: initialItems, version }: { items: Item[];
       ghostClass: 'sortable-ghost',
       animation: 200,
       filter: '.archive-header, .archive-items',
+      // Touch: require a 150ms press before drag activates. Without this,
+      // tapping the handle on a phone is ambiguous with the row's swipe-
+      // to-delete touch handler and the OS's pull-to-refresh. Mirrors the
+      // v1 photo-grid Sortable config (admin/app.js:848-849).
+      delay: 150,
+      delayOnTouchOnly: true,
+      // forceFallback makes Sortable use its own JS-based drag instead of
+      // the browser's HTML5 drag-and-drop API. Critical on touchscreens
+      // where HTML5 drag is flaky-to-absent on iOS Safari, and lets us
+      // render a visible "ghost" clone of the row while dragging.
+      forceFallback: true,
+      // Allow up to 5px of finger jitter during the 150ms delay before
+      // we cancel the drag — fingers wiggle.
+      touchStartThreshold: 5,
+      fallbackTolerance: 5,
       onMove(evt) {
         return (
           !evt.related.classList.contains('archive-header') &&
