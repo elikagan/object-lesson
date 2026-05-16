@@ -198,38 +198,15 @@ select.field:has(option[value=""]:checked) { color: var(--light); }
   cursor: pointer;
   transition: background 0.15s ease;
   border-bottom: 1px solid var(--border);
+  /* Drag listeners live on the whole row (long-press anywhere → drag).
+     `touch-action: pan-y` lets the browser handle vertical page scroll
+     while the long-press timer is running, and lets dnd-kit take over
+     once the press passes the 200ms / 5px activation constraint. */
+  touch-action: pan-y;
+  -webkit-user-select: none;
+  user-select: none;
 }
 .item-row:active { background: var(--bg2); }
-
-.item-drag {
-  /* Reset native button look (was a <div> with Sortable.js; dnd-kit wants
-     the listeners on a focusable button for keyboard a11y). */
-  background: none;
-  border: none;
-  appearance: none;
-  -webkit-appearance: none;
-
-  color: var(--light);
-  cursor: grab;
-  touch-action: none;
-  flex-shrink: 0;
-  /* Hit target: 44x44 (Apple HIG minimum), centered around the 16x16 icon. */
-  padding: 14px;
-  margin: -14px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 44px;
-  min-height: 44px;
-  box-sizing: border-box;
-}
-.item-drag:active,
-.item-drag:focus-visible { cursor: grabbing; outline: none; }
-.item-drag-disabled {
-  /* Sold items render a non-interactive copy. */
-  opacity: 0.4;
-  cursor: default;
-}
 
 .item-thumb {
   width: 52px;

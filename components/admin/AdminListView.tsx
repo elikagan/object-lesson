@@ -184,8 +184,11 @@ export function AdminListView({ items: initialItems, version }: { items: Item[];
   }
 
   function onRowClick(e: React.MouseEvent, id: string) {
-    const target = e.target as HTMLElement;
-    if (target.closest('.item-drag')) return;
+    // Drag-in-progress click suppression: when dnd-kit completes a drag,
+    // the browser sometimes synthesizes a click on touchend. Detect this
+    // via the data-dnd-kit-currently-dragging attribute the lib sets, OR
+    // by checking the event's defaultPrevented flag.
+    if (e.defaultPrevented) return;
     if (openSwipeId === id) {
       setOpenSwipeId(null);
       return;
@@ -409,23 +412,14 @@ function ItemRow({
         data-id={item.id}
         style={{ transform: isOpen ? 'translateX(-72px)' : undefined }}
         onClick={(e) => onRowClick(e, item.id)}
+        // The drag listeners live on the row itself, not a tiny handle.
+        // Long-press anywhere on the row (200ms via TouchSensor's
+        // activationConstraint) starts the drag. Short taps still fire
+        // onClick → navigate to editor. Horizontal swipes fire the
+        // swipe-to-delete handler before the 200ms delay elapses.
+        {...(sortable ? { ...sortable.attributes, ...sortable.listeners } : {})}
       >
-        {sortable ? (
-          <button
-            type="button"
-            className="item-drag"
-            aria-label="Drag to reorder"
-            {...sortable.attributes}
-            {...sortable.listeners}
-          >
-            <DragGripIcon />
-          </button>
-        ) : (
-          <div className="item-drag item-drag-disabled" aria-hidden="true">
-            <DragGripIcon />
-          </div>
-        )}
-        <div className="item-thumb">
+        <div className="item-thumb">{/* hero image */}
           {heroSrc && (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={heroSrc} alt="" />
@@ -445,18 +439,6 @@ function ItemRow({
   );
 }
 
-function DragGripIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <circle cx="9" cy="6" r="1" />
-      <circle cx="15" cy="6" r="1" />
-      <circle cx="9" cy="12" r="1" />
-      <circle cx="15" cy="12" r="1" />
-      <circle cx="9" cy="18" r="1" />
-      <circle cx="15" cy="18" r="1" />
-    </svg>
-  );
-}
 
 function MenuIcon({ name }: { name: string }) {
   switch (name) {
