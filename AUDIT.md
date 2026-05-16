@@ -373,7 +373,7 @@ Order of work: P0 → P1 → P2. Within a tier, top to bottom. Don't skip.
 ### P1 — data loss / known-bad UX
 
 - [x] **P1-13 · No analytics writes anywhere in v2.** §1.6. v1 wrote 8+ event types (`page_view`, `item_view`, `inquire`, `buy_now`, `filter`, `email_signup`, `discount_applied`, `session_end`, `gift_purchase`) to Supabase `events`. v2 writes none. Port the `trackEvent()` helper + bot-UA filter + session-id + UTM capture, then sprinkle the calls. The events table is currently going dark.
-- [ ] **P1-14 · Per-photo AI exempt toggle — not built.** §2.5. v1 had a star button on each unprocessed photo to skip background-removal (e.g. tape-measure photos). The `aiProcess` field is in the v2 type but no UI toggles it.
+- [x] **P1-14 · Per-photo AI exempt toggle — not built.** §2.5. v1 had a star button on each unprocessed photo to skip background-removal (e.g. tape-measure photos). The `aiProcess` field is in the v2 type but no UI toggles it.
 - [ ] **P1-15 · Per-photo reprocess menu — not built.** §2.5. v1 had three options per processed photo: Better lighting / Better background / Better shadow. Each maps to a Gemini prompt in `lib/admin/gemini.ts` (port from v1 `admin/app.js:962-1022`).
 - [ ] **P1-16 · Drag-to-reorder photos in editor — not built.** §2.5. v1 used Sortable.js with 150ms touch delay. Reorder must update both the `images` array order and which photo is `hero_image` (first one).
 - [x] **P1-17 · Admin Marketing view — not built.** §2.11. Email subscribers table + count + CSV export, plus discount codes list with create/toggle-active. Filters out gift certs (those live in P0-4).

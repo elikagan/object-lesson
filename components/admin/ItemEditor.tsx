@@ -322,6 +322,24 @@ export function ItemEditor({
     }
   }
 
+  /**
+   * Flip the AI-include flag on a pending photo. Photos with aiProcess=false
+   * are skipped by all four steps of the AI pipeline (price-tag OCR, tape
+   * measure detection, background removal, text suggestion). Mirrors v1
+   * admin/app.js:827-834 — the star button in the photo cell corner.
+   */
+  function toggleAiOnPhoto(idx: number) {
+    setPhotos((arr) =>
+      arr.map((p, i) => {
+        if (i !== idx) return p;
+        if (!('pendingFile' in p)) return p;
+        // Default current value to true so the first click toggles to exempt.
+        const current = p.aiProcess !== false;
+        return { ...p, aiProcess: !current } as Photo;
+      }),
+    );
+  }
+
   function removePhoto(idx: number) {
     setPhotos((arr) => {
       const next = [...arr];
@@ -525,10 +543,20 @@ export function ItemEditor({
           <div className="photo-grid">
             {photos.map((p, i) => {
               const src = 'remotePath' in p ? thumbUrl(p.remotePath) : p.preview;
+              const isPending = 'pendingFile' in p;
+              const alreadyProcessed = isPending && !!p.processed;
+              // Default aiProcess to true (mirrors v1: new uploads are
+              // AI-included unless the admin toggles them off). Only show
+              // the toggle on un-processed pending photos — once a photo
+              // has been through AI you can't re-include it via this UI.
+              const aiOn = isPending ? p.aiProcess !== false : false;
               return (
                 <div key={i} className="photo-cell">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={src} alt="" />
+                  {i === 0 && (
+                    <span className="photo-hero-dot" aria-label="Hero image" />
+                  )}
                   <button
                     type="button"
                     className="photo-remove"
@@ -537,6 +565,20 @@ export function ItemEditor({
                   >
                     ×
                   </button>
+                  {isPending && !alreadyProcessed && (
+                    <button
+                      type="button"
+                      className={`photo-ai${aiOn ? ' active' : ''}`}
+                      aria-label={aiOn ? 'Exempt from AI processing' : 'Include in AI processing'}
+                      aria-pressed={aiOn}
+                      title={aiOn ? 'AI processing on — click to exempt this photo' : 'AI processing off — click to include this photo'}
+                      onClick={() => toggleAiOnPhoto(i)}
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 16.8l-6.2 4.5 2.4-7.4L2 9.4h7.6z" />
+                      </svg>
+                    </button>
+                  )}
                 </div>
               );
             })}
