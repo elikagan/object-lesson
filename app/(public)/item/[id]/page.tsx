@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import { getItemById } from '@/lib/queries';
-import { imgUrl } from '@/lib/items';
+import { absoluteImgUrl } from '@/lib/items';
 import { DetailHeader } from '@/components/SiteHeader';
 import { SiteFooter } from '@/components/SiteFooter';
 import { ItemDetail } from '@/components/ItemDetail';
@@ -19,7 +19,7 @@ export async function generateMetadata({
   const { id } = await params;
   const item = await getItemById(id);
   if (!item) return { title: 'Not found' };
-  const ogImg = imgUrl(item.hero_image) || undefined;
+  const ogImg = absoluteImgUrl(item.hero_image) || undefined;
   const description =
     item.description?.slice(0, 200) || `${item.title} — Object Lesson, Pasadena.`;
   const canonical = `${SITE_URL}/item/${id}`;
@@ -49,7 +49,7 @@ export async function generateMetadata({
  */
 function buildProductLd(item: Item) {
   const url = `${SITE_URL}/item/${item.id}`;
-  const image = imgUrl(item.hero_image);
+  const image = absoluteImgUrl(item.hero_image);
   const availability = item.is_sold
     ? 'https://schema.org/SoldOut'
     : item.is_hold
