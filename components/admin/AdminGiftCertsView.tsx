@@ -17,11 +17,11 @@ import { type GiftCert, giftCertStatus } from '@/lib/types';
  *     + email + date. Void button on Active rows only.
  *   - Empty state when no gift certs exist.
  *
- * Note: the v1 form had an "auto-email recipient" path that hit a
- * `/send-gift-email` worker endpoint. That endpoint hasn't been ported yet
- * (audit row P1-19). Until it ships, this form stores `purchaser_email`
- * on the record but does not auto-send; the success state shows the code
- * so the admin can email it manually.
+ * Auto-email: when the create form supplies a recipient email, the new
+ * gift cert is also POSTed to /api/admin/send-gift-email which hands off
+ * to Resend (mirrors v1 worker handleSendGiftEmail). If email delivery
+ * fails the cert is still created — admin sees a "created but email
+ * failed" feedback message and can resend or copy the code manually.
  */
 export function AdminGiftCertsView({ initial }: { initial: GiftCert[] }) {
   const router = useRouter();
@@ -60,14 +60,46 @@ export function AdminGiftCertsView({ initial }: { initial: GiftCert[] }) {
         throw new Error(body.error ?? 'Create failed');
       }
       setGiftcerts((prev) => [body.giftcert!, ...prev]);
+      const created = body.giftcert;
       setAmount('');
       setPurchaser('');
       setRecipient('');
       setEmail('');
-      setFeedback({
-        kind: 'ok',
-        text: `Created ${body.giftcert.code}${email ? ` — email manually to ${email}` : ''}`,
-      });
+
+      // Auto-email the recipient if an address was supplied. Cert is
+      // already created; an email failure is non-fatal.
+      if (email) {
+        try {
+          const emailRes = await fetch('/api/admin/send-gift-email', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              code: created.code,
+              amount: Number(created.value),
+              email,
+              purchaserName: purchaser || undefined,
+              recipientName: recipient || undefined,
+            }),
+          });
+          if (!emailRes.ok) {
+            const errBody = (await emailRes.json().catch(() => ({}))) as { error?: string };
+            setFeedback({
+              kind: 'err',
+              text: `Created ${created.code} but email failed: ${errBody.error ?? 'unknown error'}. You can copy the code manually.`,
+            });
+            return;
+          }
+          setFeedback({ kind: 'ok', text: `Created ${created.code} and emailed to ${email}.` });
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : 'unknown';
+          setFeedback({
+            kind: 'err',
+            text: `Created ${created.code} but email failed: ${msg}. You can copy the code manually.`,
+          });
+        }
+      } else {
+        setFeedback({ kind: 'ok', text: `Created ${created.code}.` });
+      }
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Create failed';
       setFeedback({ kind: 'err', text: msg });
