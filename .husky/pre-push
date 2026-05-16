@@ -1,3 +1,8 @@
 # Full test suite before any push to remote.
 # Refuses the push if anything fails.
-npm test
+#
+# Force sequential execution (CI=1) so the local run matches what GitHub
+# Actions does. The default parallel mode hits the dev server with 5
+# workers during cold-compile, which causes Next.js route compilation
+# to flake under load and produces false negatives on a clean tree.
+CI=1 npm test
