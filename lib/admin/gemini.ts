@@ -242,3 +242,57 @@ export async function geminiSuggest(dataUrls: string[]): Promise<Suggestions> {
 }
 
 export { toTitleCase };
+
+// ─── Reprocess single image (lighting / background / shadow) ─────────
+//
+// Mirrors v1 admin/app.js:962-1022 reprocessImage() — three targeted
+// follow-up prompts that take an already-AI-cleaned image and improve
+// one specific aspect. Used by the per-photo "Reprocess" menu in the
+// item editor (P1-15).
+export type ReprocessMode = 'lighting' | 'background' | 'shadow';
+
+const REPROCESS_PROMPTS: Record<ReprocessMode, string> = {
+  lighting:
+    'This product photo has been processed but the lighting needs improvement. Significantly improve the lighting and color balance — make it look bright, clean, and professionally lit. Keep the pure white background, the exact same composition and crop, and any existing shadows. Only change the lighting on the object itself. Return only the edited image.',
+  background:
+    'This product photo has been processed but still has background artifacts or an imperfect background. Completely remove all background elements and replace with pure white (#FFFFFF). Keep the exact same composition, crop, angle, scale, lighting, and shadows on the object. Only fix the background. Return only the edited image.',
+  shadow:
+    'This product photo has been processed but the shadow needs improvement. Add a more natural, subtle shadow: for objects that sit on a surface, add a soft contact shadow directly beneath; for wall art or flat items, add a faint drop shadow behind as if wall-mounted. Remove any existing harsh, unnatural, or misplaced shadows first. Keep the white background and exact same composition. Return only the edited image.',
+};
+
+export async function geminiReprocessPhoto(
+  dataUrl: string,
+  mode: ReprocessMode,
+): Promise<string | null> {
+  const resized = await resizeImage(dataUrl, 1536);
+  const base64 = dataUrlToBase64(resized);
+  try {
+    const result = await geminiCall(
+      'gemini-2.5-flash-image',
+      [
+        {
+          parts: [
+            { text: REPROCESS_PROMPTS[mode] },
+            { inlineData: { mimeType: 'image/jpeg', data: base64 } },
+          ],
+        },
+      ],
+      { responseModalities: ['IMAGE', 'TEXT'] },
+    );
+
+    const parts = result.candidates[0].content.parts;
+    const imgPart = parts.find(
+      (p): p is { inlineData: { mimeType: string; data: string } } => 'inlineData' in p,
+    );
+    if (imgPart) {
+      return `data:${imgPart.inlineData.mimeType};base64,${imgPart.inlineData.data}`;
+    }
+    // No image returned — log the text response if any, for debugging.
+    const textPart = parts.find((p): p is { text: string } => 'text' in p);
+    if (textPart) console.warn('[gemini] reprocess returned no image:', textPart.text);
+    return null;
+  } catch (err) {
+    console.warn(`[gemini] reprocess ${mode} failed:`, err);
+    return null;
+  }
+}

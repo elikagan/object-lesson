@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   DndContext,
@@ -29,8 +29,10 @@ import {
   geminiDetectTag,
   geminiDetectTapeMeasure,
   geminiRemoveBackground,
+  geminiReprocessPhoto,
   geminiSuggest,
   toTitleCase,
+  type ReprocessMode,
 } from '@/lib/admin/gemini';
 
 /**
@@ -184,6 +186,70 @@ export function ItemEditor({
   // Only operates on pending (unsaved, un-uploaded) photos. Existing remote
   // photos are left alone — re-processing on edit isn't supported.
   const [aiBusy, setAiBusy] = useState(false);
+  // Per-photo reprocess state (P1-15). reprocessingIdx is the photo index
+  // currently being reprocessed (shows a spinner overlay); openMenuIdx is
+  // the index whose Better-lighting/background/shadow menu is open.
+  const [reprocessingIdx, setReprocessingIdx] = useState<number | null>(null);
+  const [openReprocessMenuIdx, setOpenReprocessMenuIdx] = useState<number | null>(null);
+
+  // Close the reprocess menu when the user clicks outside it (matches v1
+  // admin/app.js:836-839 — a one-shot document listener that fires on the
+  // next click anywhere).
+  useEffect(() => {
+    if (openReprocessMenuIdx === null) return;
+    function onDocClick() {
+      setOpenReprocessMenuIdx(null);
+    }
+    // setTimeout so the click that OPENED the menu doesn't immediately
+    // close it via this same listener firing on the same tick.
+    const t = setTimeout(() => {
+      document.addEventListener('click', onDocClick, { once: true });
+    }, 0);
+    return () => {
+      clearTimeout(t);
+      document.removeEventListener('click', onDocClick);
+    };
+  }, [openReprocessMenuIdx]);
+
+  async function reprocessPhoto(idx: number, mode: ReprocessMode) {
+    const photo = photos[idx];
+    if (!photo || !('pendingFile' in photo)) return;
+    setOpenReprocessMenuIdx(null);
+    setReprocessingIdx(idx);
+    try {
+      const dataUrl = await fileToDataUrl(photo.pendingFile);
+      const cleaned = await geminiReprocessPhoto(dataUrl, mode);
+      if (!cleaned) {
+        setStatus(`Reprocess (${mode}) failed — try again.`);
+        setTimeout(() => setStatus(''), 3000);
+        return;
+      }
+      // Replace the file + preview with the new bytes. Mirrors what
+      // step 3 (background removal) does in processWithAI.
+      const newFile = dataUrlToFile(
+        cleaned,
+        photo.pendingFile.name.replace(/\.\w+$/, '.jpg'),
+      );
+      const newPreview = URL.createObjectURL(newFile);
+      setPhotos((arr) =>
+        arr.map((p, i) => {
+          if (i !== idx) return p;
+          if (!('pendingFile' in p)) return p;
+          if ('preview' in p) URL.revokeObjectURL(p.preview);
+          return {
+            pendingFile: newFile,
+            preview: newPreview,
+            processed: true,
+            aiProcess: p.aiProcess ?? true,
+          } as Photo;
+        }),
+      );
+      setStatus(`Reprocessed (${mode}).`);
+      setTimeout(() => setStatus(''), 2000);
+    } finally {
+      setReprocessingIdx(null);
+    }
+  }
 
   async function processWithAI() {
     if (aiBusy) return;
@@ -628,6 +694,12 @@ export function ItemEditor({
                     index={i}
                     onRemove={removePhoto}
                     onToggleAi={toggleAiOnPhoto}
+                    onReprocess={reprocessPhoto}
+                    reprocessing={reprocessingIdx === i}
+                    menuOpen={openReprocessMenuIdx === i}
+                    onMenuToggle={() =>
+                      setOpenReprocessMenuIdx((cur) => (cur === i ? null : i))
+                    }
                   />
                 ))}
               </div>
@@ -834,11 +906,19 @@ function SortablePhotoCell({
   index,
   onRemove,
   onToggleAi,
+  onReprocess,
+  reprocessing,
+  menuOpen,
+  onMenuToggle,
 }: {
   photo: Photo;
   index: number;
   onRemove: (idx: number) => void;
   onToggleAi: (idx: number) => void;
+  onReprocess: (idx: number, mode: ReprocessMode) => void;
+  reprocessing: boolean;
+  menuOpen: boolean;
+  onMenuToggle: () => void;
 }) {
   const {
     setNodeRef,
@@ -904,6 +984,58 @@ function SortablePhotoCell({
             <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 16.8l-6.2 4.5 2.4-7.4L2 9.4h7.6z" />
           </svg>
         </button>
+      )}
+      {isPending && alreadyProcessed && (
+        <>
+          <button
+            type="button"
+            className="photo-reprocess"
+            aria-label="Reprocess photo"
+            title="Reprocess"
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              onMenuToggle();
+            }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M1 4v6h6" />
+              <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
+            </svg>
+          </button>
+          <div
+            className={`photo-reprocess-menu${menuOpen ? '' : ' hidden'}`}
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              className="reprocess-opt"
+              onClick={() => onReprocess(index, 'lighting')}
+            >
+              Better lighting
+            </button>
+            <button
+              type="button"
+              className="reprocess-opt"
+              onClick={() => onReprocess(index, 'background')}
+            >
+              Better background removal
+            </button>
+            <button
+              type="button"
+              className="reprocess-opt"
+              onClick={() => onReprocess(index, 'shadow')}
+            >
+              Better shadow
+            </button>
+          </div>
+        </>
+      )}
+      {reprocessing && (
+        <div className="photo-processing-overlay" aria-hidden="true">
+          <span className="photo-spinner" />
+        </div>
       )}
     </div>
   );
