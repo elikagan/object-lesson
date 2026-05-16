@@ -55,6 +55,16 @@ const nextConfig: NextConfig = {
         ],
       },
       {
+        // Service worker lives at root but needs to claim the /admin/
+        // scope — Service-Worker-Allowed must be set on the SW response
+        // (not at the calling page) per spec.
+        source: '/admin-sw.js',
+        headers: [
+          { key: 'Service-Worker-Allowed', value: '/admin/' },
+          { key: 'Cache-Control', value: 'public, max-age=0, must-revalidate' },
+        ],
+      },
+      {
         // Skip admin routes (broader script needs for the editor) and
         // /api (API routes set their own headers).
         source: '/((?!admin|api).*)',
