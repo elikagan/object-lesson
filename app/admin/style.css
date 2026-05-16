@@ -206,6 +206,17 @@ select.field:has(option[value=""]:checked) { color: var(--light); }
   cursor: grab;
   touch-action: none;
   flex-shrink: 0;
+  /* Bigger hit target than the visual icon — easier to land a finger on
+     a phone. The SVG itself stays 16x16; the padding extends the
+     clickable area to 44x44 (Apple HIG minimum). */
+  padding: 14px;
+  margin: -14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  box-sizing: border-box;
 }
 .item-drag:active { cursor: grabbing; }
 
