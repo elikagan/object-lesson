@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { type GiftCert, giftCertStatus } from '@/lib/types';
+import { useConfirmDialog } from './ConfirmDialog';
 
 /**
  * Admin Gift Certificates view — matches v1 admin/app.js loadGiftCertificates()
@@ -34,6 +35,7 @@ export function AdminGiftCertsView({ initial }: { initial: GiftCert[] }) {
   const [feedback, setFeedback] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null);
   const [voidingId, startVoidTransition] = useTransition();
   const [voidingTarget, setVoidingTarget] = useState<string | null>(null);
+  const { confirm: confirmAsync, dialog: confirmDialog } = useConfirmDialog();
 
   async function onCreate(e: React.FormEvent) {
     e.preventDefault();
@@ -108,8 +110,12 @@ export function AdminGiftCertsView({ initial }: { initial: GiftCert[] }) {
     }
   }
 
-  function onVoid(id: string) {
-    if (!confirm('Void this gift certificate? It cannot be redeemed afterward.')) return;
+  async function onVoid(id: string) {
+    const ok = await confirmAsync(
+      'Void this gift certificate? It cannot be redeemed afterward.',
+      { confirmLabel: 'Void' },
+    );
+    if (!ok) return;
     setVoidingTarget(id);
     startVoidTransition(async () => {
       try {
@@ -228,6 +234,7 @@ export function AdminGiftCertsView({ initial }: { initial: GiftCert[] }) {
           </div>
         </section>
       </div>
+      {confirmDialog}
     </div>
   );
 }

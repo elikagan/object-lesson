@@ -34,6 +34,7 @@ import {
   toTitleCase,
   type ReprocessMode,
 } from '@/lib/admin/gemini';
+import { useConfirmDialog } from './ConfirmDialog';
 
 /**
  * Editor — matches v1 admin/index.html lines 87-185 verbatim.
@@ -157,6 +158,7 @@ export function ItemEditor({
   // stays true.
   const [rowCreated, setRowCreated] = useState(mode === 'edit');
   const photoInputRef = useRef<HTMLInputElement>(null);
+  const { confirm: confirmAsync, dialog: confirmDialog } = useConfirmDialog();
 
   function onAddPhotos(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files ?? []);
@@ -601,7 +603,10 @@ export function ItemEditor({
   async function onDelete() {
     if (!item) return;
     if (saving) return;
-    if (!confirm(`Delete ${item.title || 'this item'}?`)) return;
+    const ok = await confirmAsync(`Delete ${item.title || 'this item'}?`, {
+      confirmLabel: 'Delete',
+    });
+    if (!ok) return;
     setSaving(true);
     setStatus('Deleting...');
     try {
@@ -880,6 +885,7 @@ export function ItemEditor({
           </button>
         </section>
       </div>
+      {confirmDialog}
     </div>
   );
 }
