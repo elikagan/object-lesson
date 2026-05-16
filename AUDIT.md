@@ -390,7 +390,7 @@ Order of work: P0 → P1 → P2. Within a tier, top to bottom. Don't skip.
 
 ### P2 — polish (don't touch until P0/P1 empty)
 
-- [ ] **P2-28 · PWA service worker + manifest** for admin (offline shell, Add to Home Screen).
+- [x] **P2-28 · PWA service worker + manifest** for admin (offline shell, Add to Home Screen).
 - [x] **P2-29 · CSP header** on public pages (currently relying on Next.js defaults).
 - [x] **P2-30 · Mosaic pause** when tab hidden or on detail view.
 - [x] **P2-31 · Card fade-up animation** with 0.04s stagger.
