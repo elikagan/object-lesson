@@ -258,8 +258,30 @@ export function ItemEditor({
     const pendingIndices = photos
       .map((p, i) => ('pendingFile' in p ? i : -1))
       .filter((i) => i >= 0);
-    if (pendingIndices.length === 0) {
+    // Diagnostic: when the click is a no-op, the console line below tells
+    // us exactly why (added 2026-05-29 after a silent no-op shipped that
+    // could not be diagnosed from server logs alone).
+    console.info('[ai] processWithAI clicked', {
+      totalPhotos: photos.length,
+      pendingCount: pendingIndices.length,
+      shapes: photos.map((p) =>
+        'pendingFile' in p
+          ? { kind: 'pending', name: p.pendingFile?.name, size: p.pendingFile?.size }
+          : { kind: 'remote', remotePath: p.remotePath },
+      ),
+    });
+    if (photos.length === 0) {
       setStatus('Add photos first.');
+      return;
+    }
+    if (pendingIndices.length === 0) {
+      // User sees photos on screen but they're all already-uploaded
+      // (remote) — AI processing only runs on new pending photos. Most
+      // commonly hit when re-opening an item in edit mode: the existing
+      // photos are remote and can't be re-AI'd.
+      setStatus(
+        'These photos are already saved — AI processing only runs on newly added photos.',
+      );
       return;
     }
     setAiBusy(true);
@@ -746,7 +768,22 @@ export function ItemEditor({
           >
             {aiBusy ? 'Processing…' : 'Process with AI'}
           </button>
-          <div className="processing-status" />
+          {/* Always-visible status line for AI processing. Previously the
+              busy-overlay was the only surface that showed status text, so
+              early-returns (e.g. "Add photos first") that fired BEFORE
+              setAiBusy(true) had no visible feedback at all — the click
+              looked like a complete no-op. Keep this rendered whenever
+              status is set, regardless of aiBusy. */}
+          {status && !saving && (
+            <div
+              className="processing-status"
+              role="status"
+              aria-live="polite"
+              style={{ marginTop: 8, fontSize: 13, color: 'var(--text-secondary, #555)' }}
+            >
+              {status}
+            </div>
+          )}
         </section>
 
         <section className="editor-section">
