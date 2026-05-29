@@ -35,8 +35,22 @@ async function geminiCall(
     body: JSON.stringify({ model, contents, generationConfig: config }),
   });
   if (!res.ok) {
-    const data = await res.json().catch(() => ({}) as { error?: string });
-    throw new Error(data.error ?? res.statusText);
+    // Google's error envelope is { error: { code, message, status } } —
+    // an object, not a string. Pre-fix this got coerced via `new Error(obj)`
+    // to "[object Object]" and the real cause was lost.
+    const data = (await res.json().catch(() => ({}))) as {
+      error?: string | { message?: string; status?: string; code?: number };
+    };
+    const raw = data.error;
+    const msg =
+      typeof raw === 'string'
+        ? raw
+        : raw && typeof raw === 'object'
+          ? [raw.status, raw.code != null ? `(${raw.code})` : null, raw.message]
+              .filter(Boolean)
+              .join(' ') || JSON.stringify(raw)
+          : res.statusText || `HTTP ${res.status}`;
+    throw new Error(`Gemini ${res.status}: ${msg}`);
   }
   return res.json();
 }
