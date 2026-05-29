@@ -202,7 +202,7 @@ export async function geminiRemoveBackground(dataUrl: string): Promise<string | 
           {
             parts: [
               {
-                text: 'Edit this photo. Output the edited image. Remove everything except the main object. Set the background to solid white. Keep the object in the same position and size. Improve the lighting on the object. Add a small soft shadow under the object.',
+                text: "Edit this photo to isolate the main object on a pure white background. Carefully trace the entire silhouette of the object including all fine details (handles, rims, narrow protrusions, edges of fabric or hair). Replace EVERY pixel of the original background with pure white #FFFFFF — no shadows, gradients, or remnants of the original scene should remain. Edges must be clean and anti-aliased, not jagged. Keep the object in the same position, size, and orientation. Improve the lighting on the object so it's evenly lit without blowing out details. Add a small soft realistic drop shadow directly beneath the object so it doesn't look floating. Output the edited image.",
               },
               { inlineData: { mimeType: 'image/jpeg', data: base64 } },
             ],
